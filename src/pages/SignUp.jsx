@@ -6,6 +6,8 @@ import TextField from '@mui/material/TextField'
 import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
 import Stack from '@mui/material/Stack'
+import Link from '@mui/material/Link'
+import { Link as RouterLink } from 'react-router-dom'
 
 export default function SignUp() {
   const navigate = useNavigate()
@@ -211,6 +213,14 @@ export default function SignUp() {
             >
               Complete Sign Up
             </Button>
+            <Box sx={{ textAlign: 'center', mt: 2 }}>
+              <Typography variant="body2">
+                Already have an account?{' '}
+                <Link component={RouterLink} to="/signin" underline="hover">
+                  Sign in
+                </Link>
+              </Typography>
+            </Box>
           </Stack>
         </Box>
       </Paper>
