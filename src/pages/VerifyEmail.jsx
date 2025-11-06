@@ -31,13 +31,29 @@ export default function VerifyEmail() {
     if (error) setError('')
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (code.length !== 6) {
       setError('Please enter a 6-digit verification code')
       return
     }
-    // Verification logic will go here
+    try {
+      const response = await fetch('https://tcgid.io/api/signup/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email,
+          code: code,
+        }),
+      })
+
+      const responseData = await response.json()
+      console.log('Verify email response:', responseData)
+    } catch (error) {
+      console.error('Verify email error:', error)
+    }
   }
 
   if (!email) {

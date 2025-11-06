@@ -22,7 +22,7 @@ export default function ForgotPassword() {
     if (error) setError('')
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (!email) {
       setError('Please enter your email address')
@@ -32,8 +32,23 @@ export default function ForgotPassword() {
       setError('Please enter a valid email address')
       return
     }
-    // Form submission logic will go here
-    setSubmitted(true)
+    try {
+      const response = await fetch('https://tcgid.io/api/login/forgot', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email,
+        }),
+      })
+
+      const responseData = await response.json()
+      console.log('Forgot password response:', responseData)
+      setSubmitted(true)
+    } catch (error) {
+      console.error('Forgot password error:', error)
+    }
   }
 
   if (submitted) {
