@@ -106,12 +106,32 @@ export default function SignUp() {
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (validateForm()) {
-      // Redirect to verify email page with email as query parameter
-      const encodedEmail = encodeURIComponent(formData.email)
-      navigate(`/verify?email=${encodedEmail}`)
+      try {
+        const response = await fetch('https://tcgid.io/api/signup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            email: formData.email,
+            password: formData.password,
+          }),
+        })
+
+        const responseData = await response.json()
+        console.log('Signup response:', responseData)
+
+        // Redirect to verify email page with email as query parameter
+        const encodedEmail = encodeURIComponent(formData.email)
+        navigate(`/verify?email=${encodedEmail}`)
+      } catch (error) {
+        console.error('Signup error:', error)
+      }
     }
   }
 
