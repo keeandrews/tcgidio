@@ -16,6 +16,8 @@ export default function Navigation() {
         <Stack direction="row" spacing={1}>
           <Button color="inherit" component={RouterLink} to="/">Home</Button>
           <Button color="inherit" component={RouterLink} to="/about">About</Button>
+          <Button color="inherit" component={RouterLink} to="/signin">Sign In</Button>
+          <Button color="inherit" component={RouterLink} to="/signup">Sign Up</Button>
         </Stack>
       </Toolbar>
     </AppBar>
