@@ -9,6 +9,9 @@ import Stack from '@mui/material/Stack'
 import Link from '@mui/material/Link'
 import { Link as RouterLink } from 'react-router-dom'
 
+import Snackbar from '@mui/material/Snackbar'
+import Alert from '@mui/material/Alert'
+
 export default function SignUp() {
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
@@ -24,6 +27,21 @@ export default function SignUp() {
     password: '',
     confirmPassword: '',
   })
+
+  const [snackbarOpen, setSnackbarOpen] = useState(false)
+  const [snackbarMessage, setSnackbarMessage] = useState('')
+  const [snackbarSeverity, setSnackbarSeverity] = useState('success')
+
+  const showToast = (message, severity = 'success') => {
+    setSnackbarMessage(message)
+    setSnackbarSeverity(severity)
+    setSnackbarOpen(true)
+  }
+
+  const handleCloseSnackbar = (event, reason) => {
+    if (reason === 'clickaway') return
+    setSnackbarOpen(false)
+  }
 
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -122,15 +140,33 @@ export default function SignUp() {
             password: formData.password,
           }),
         })
+        let responseData = null
+        try {
+          responseData = await response.json()
+        } catch (e) {
+          responseData = null
+        }
 
-        const responseData = await response.json()
-        console.log('Signup response:', responseData)
-
-        // Redirect to verify email page with email as query parameter
-        const encodedEmail = encodeURIComponent(formData.email)
-        navigate(`/verify?email=${encodedEmail}`)
+        if (response.status === 201) {
+          showToast('Account created. Please verify your email.', 'success')
+          const encodedEmail = encodeURIComponent(formData.email)
+          navigate(`/verify?email=${encodedEmail}`)
+        } else if (response.status === 400) {
+          const message =
+            typeof (responseData && responseData.data) === 'string'
+              ? responseData.data
+              : 'Invalid request. Please check your details and try again.'
+          showToast(message, 'error')
+        } else if (response.status === 500) {
+          showToast('Internal server error', 'error')
+        } else {
+          const message =
+            (responseData && typeof responseData.data === 'string' && responseData.data) ||
+            'Unexpected error occurred'
+          showToast(message, 'error')
+        }
       } catch (error) {
-        console.error('Signup error:', error)
+        showToast('Network error. Please try again.', 'error')
       }
     }
   }
@@ -244,6 +280,16 @@ export default function SignUp() {
           </Stack>
         </Box>
       </Paper>
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: '100%' }}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   )
 }
