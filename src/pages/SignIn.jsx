@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import Paper from '@mui/material/Paper'
 import Box from '@mui/material/Box'
 import TextField from '@mui/material/TextField'
@@ -8,11 +9,37 @@ import Stack from '@mui/material/Stack'
 import Link from '@mui/material/Link'
 import { Link as RouterLink } from 'react-router-dom'
 
+import Snackbar from '@mui/material/Snackbar'
+import Alert from '@mui/material/Alert'
+
 export default function SignIn() {
   const [formData, setFormData] = useState({
     username: '',
     password: '',
   })
+
+  const location = useLocation()
+  const [snackbarOpen, setSnackbarOpen] = useState(false)
+  const [snackbarMessage, setSnackbarMessage] = useState('')
+  const [snackbarSeverity, setSnackbarSeverity] = useState('success')
+
+  useEffect(() => {
+    const state = location.state
+    const message = state?.toastMessage || state?.toast?.message
+    const severity = state?.toastSeverity || state?.toast?.severity || 'success'
+    if (message) {
+      setSnackbarMessage(message)
+      setSnackbarSeverity(severity)
+      setSnackbarOpen(true)
+      // Clear the state so the toast doesn't reappear on back/forward
+      window.history.replaceState({}, document.title, location.pathname)
+    }
+  }, [location])
+
+  const handleCloseSnackbar = (event, reason) => {
+    if (reason === 'clickaway') return
+    setSnackbarOpen(false)
+  }
 
   const handleChange = (e) => {
     setFormData({
@@ -109,6 +136,16 @@ export default function SignIn() {
           </Stack>
         </Box>
       </Paper>
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: '100%' }}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   )
 }
