@@ -148,9 +148,12 @@ export default function SignUp() {
         }
 
         if (response.status === 201) {
-          showToast('Account created. Please verify your email.', 'success')
-          const encodedEmail = encodeURIComponent(formData.email)
-          navigate(`/verify?email=${encodedEmail}`)
+          navigate('/signin', {
+            state: {
+              toastMessage: 'Account created. Please sign in.',
+              toastSeverity: 'success',
+            },
+          })
         } else if (response.status === 400) {
           const message =
             typeof (responseData && responseData.data) === 'string'
