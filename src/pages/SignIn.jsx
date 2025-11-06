@@ -21,9 +21,25 @@ export default function SignIn() {
     })
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    // Button does nothing for now as requested
+    try {
+      const response = await fetch('https://tcgid.io/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: formData.username,
+          password: formData.password,
+        }),
+      })
+
+      const responseData = await response.json()
+      console.log('Login response:', responseData)
+    } catch (error) {
+      console.error('Login error:', error)
+    }
   }
 
   const isFormValid = () => {
