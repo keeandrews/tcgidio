@@ -12,6 +12,7 @@ import CancelIcon from '@mui/icons-material/Cancel'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import HomeIcon from '@mui/icons-material/Home'
 import RefreshIcon from '@mui/icons-material/Refresh'
+import DeleteIcon from '@mui/icons-material/Delete'
 
 export default function Integrations() {
   const [searchParams] = useSearchParams()
@@ -21,6 +22,7 @@ export default function Integrations() {
   const [toastOpen, setToastOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [integration, setIntegration] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   const handleLinkEbayClick = async () => {
     try {
@@ -47,6 +49,54 @@ export default function Integrations() {
       }
     } catch (e) {
       setError('Unable to start eBay linking. Please try again.')
+    }
+  }
+
+  const handleDeleteEbayClick = async () => {
+    try {
+      setError(null)
+      const token = localStorage.getItem('token')
+      if (!token) {
+        setError('You must be signed in to unlink your eBay account.')
+        setToastOpen(true)
+        return
+      }
+
+      setDeleting(true)
+      const res = await fetch('https://tcgid.io/api/auth/integrations/ebay', {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      if (!res.ok) {
+        throw new Error('Failed to disconnect eBay integration')
+      }
+      const json = await res.json()
+      if (json?.success) {
+        const confirmRes = await fetch('https://tcgid.io/api/auth/integrations/ebay', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+        if (!confirmRes.ok) {
+          throw new Error('Failed to verify integration removal')
+        }
+        const confirmJson = await confirmRes.json()
+        if (confirmJson?.success && !confirmJson?.data) {
+          setIntegration(null)
+        } else {
+          setIntegration(confirmJson?.data || null)
+        }
+      } else {
+        throw new Error('Failed to disconnect eBay integration')
+      }
+    } catch (e) {
+      setError('Unable to disconnect eBay integration. Please try again later.')
+      setToastOpen(true)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -286,8 +336,18 @@ export default function Integrations() {
                   variant="outlined"
                   startIcon={<RefreshIcon />}
                   onClick={() => window.location.reload()}
+                  disabled={deleting}
                 >
                   Refresh
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  startIcon={<DeleteIcon />}
+                  onClick={handleDeleteEbayClick}
+                  disabled={deleting || loading}
+                >
+                  Delete
                 </Button>
               </Stack>
             </Stack>
