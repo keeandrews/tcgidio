@@ -60,21 +60,28 @@ export default function Home() {
     }
   }, [])
 
-  const handleConnectToEbay = async () => {
+  const handleLinkEbayClick = async () => {
     try {
-      const response = await fetch('https://tcgid.io/api/auth/ebay/start', {
-        method: 'POST',
+      const token = localStorage.getItem('token')
+      if (!token) {
+        console.error('No auth token found')
+        return
+      }
+
+      const res = await fetch('https://tcgid.io/api/auth/ebay/start', {
+        method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
       })
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+
+      const json = await res.json()
+
+      if (json?.success && json?.data?.authorizationUrl) {
+        window.location.href = json.data.authorizationUrl
+      } else {
+        console.error('Unexpected response from start endpoint', json)
       }
-      
-      const data = await response.json()
-      console.log('eBay connection response:', data)
     } catch (error) {
       console.error('Error connecting to eBay:', error)
     }
@@ -94,9 +101,9 @@ export default function Home() {
           <Box sx={{ mt: 3 }}>
             <Button 
               variant="contained" 
-              onClick={handleConnectToEbay}
+              onClick={handleLinkEbayClick}
             >
-              Connect to eBay
+              Link eBay Account
             </Button>
           </Box>
         )}

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import Typography from '@mui/material/Typography'
 import Paper from '@mui/material/Paper'
@@ -15,6 +15,35 @@ export default function Integrations() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const ebayStatus = searchParams.get('ebay')
+  const [error, setError] = useState(null)
+
+  const handleLinkEbayClick = async () => {
+    try {
+      setError(null)
+      const token = localStorage.getItem('token')
+      if (!token) {
+        setError('You must be signed in to link your eBay account.')
+        return
+      }
+
+      const res = await fetch('https://tcgid.io/api/auth/ebay/start', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      const json = await res.json()
+
+      if (json?.success && json?.data?.authorizationUrl) {
+        window.location.href = json.data.authorizationUrl
+      } else {
+        setError('Unable to start eBay linking. Please try again.')
+      }
+    } catch (e) {
+      setError('Unable to start eBay linking. Please try again.')
+    }
+  }
 
   // Show success message if ebay=connected
   if (ebayStatus === 'connected') {
@@ -114,7 +143,21 @@ export default function Integrations() {
           </Box>
         </Box>
 
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            <Typography variant="body2">
+              {error}
+            </Typography>
+          </Alert>
+        )}
+
         <Stack direction="row" spacing={2} justifyContent="center" flexWrap="wrap">
+          <Button
+            variant="contained"
+            onClick={handleLinkEbayClick}
+          >
+            Link eBay Account
+          </Button>
           <Button
             variant="contained"
             startIcon={<HomeIcon />}
