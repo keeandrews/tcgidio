@@ -7,6 +7,7 @@ import Button from '@mui/material/Button'
 import Stack from '@mui/material/Stack'
 import Alert from '@mui/material/Alert'
 import CancelIcon from '@mui/icons-material/Cancel'
+import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import HomeIcon from '@mui/icons-material/Home'
 import RefreshIcon from '@mui/icons-material/Refresh'
 
@@ -14,6 +15,66 @@ export default function Integrations() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const ebayStatus = searchParams.get('ebay')
+
+  // Show success message if ebay=connected
+  if (ebayStatus === 'connected') {
+    return (
+      <Paper elevation={0} sx={{ p: 4, maxWidth: 600, mx: 'auto' }}>
+        <Box sx={{ textAlign: 'center', mb: 4 }}>
+          <CheckCircleIcon 
+            sx={{ 
+              fontSize: 80, 
+              color: 'success.main',
+              mb: 2 
+            }} 
+          />
+          <Typography variant="h4" gutterBottom>
+            eBay Account Connected
+          </Typography>
+          <Typography variant="body1" color="text.secondary" paragraph>
+            Your eBay account has been successfully connected to your account.
+          </Typography>
+        </Box>
+
+        <Alert severity="success" sx={{ mb: 3 }}>
+          <Typography variant="body2">
+            Your eBay account is now connected and ready to use. You can start syncing your data and managing your listings.
+          </Typography>
+        </Alert>
+
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="body1" paragraph>
+            With your eBay account connected, you can now:
+          </Typography>
+          <Box component="ul" sx={{ pl: 3, mb: 3 }}>
+            <li>Access your eBay listings and data</li>
+            <li>Manage your trading card inventory</li>
+            <li>Sync information between platforms</li>
+          </Box>
+        </Box>
+
+        <Stack direction="row" spacing={2} justifyContent="center" flexWrap="wrap">
+          <Button
+            variant="contained"
+            startIcon={<HomeIcon />}
+            onClick={() => navigate('/')}
+          >
+            Go to Home
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={() => {
+              // Remove the query parameter and show the integrations page
+              navigate('/integrations', { replace: true })
+            }}
+          >
+            View Integrations
+          </Button>
+        </Stack>
+      </Paper>
+    )
+  }
 
   // Show declined message if ebay=denied
   if (ebayStatus === 'denied') {
