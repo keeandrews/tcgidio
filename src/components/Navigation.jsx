@@ -9,6 +9,7 @@ import Menu from '@mui/material/Menu'
 import MenuItem from '@mui/material/MenuItem'
 import { Link as RouterLink } from 'react-router-dom'
 import AccountCircleIcon from '@mui/icons-material/AccountCircle'
+import Box from '@mui/material/Box'
 
 export default function Navigation() {
   const navigate = useNavigate()
@@ -118,9 +119,70 @@ export default function Navigation() {
   return (
     <AppBar position="static" color="primary" enableColorOnDark>
       <Toolbar>
-        <Typography variant="h6" sx={{ flexGrow: 1 }}>
-          TCGIDIO
-        </Typography>
+        <Box
+          component={RouterLink}
+          to="/"
+          sx={{
+            flexGrow: 1,
+            display: 'flex',
+            alignItems: 'center',
+            textDecoration: 'none',
+            cursor: 'pointer',
+            '&:hover': {
+              opacity: 0.8,
+            },
+          }}
+        >
+          <svg
+            width="200"
+            height="48"
+            viewBox="0 0 200 48"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            {/* Icon: simplified front card, subtle shadow for back card */}
+            <g>
+              {/* Shadow/back card outline (no overlap edges) */}
+              <rect
+                x="5"
+                y="8"
+                width="20"
+                height="28"
+                rx="3"
+                fill="none"
+                stroke="rgba(255,255,255,0.35)"
+                strokeWidth="2"
+              />
+              {/* Main front card */}
+              <rect
+                x="9"
+                y="10"
+                width="20"
+                height="28"
+                rx="3"
+                fill="none"
+                stroke="#FFFFFF"
+                strokeWidth="2"
+              />
+              {/* Circular "AI" dot */}
+              <circle cx="19" cy="17" r="2.3" fill="#FFFFFF" />
+              {/* Horizontal ID line */}
+              <rect x="15" y="24" width="8" height="2.2" rx="1" fill="#FFFFFF" />
+            </g>
+            {/* Text label */}
+            <text
+              x="45"
+              y="29"
+              fill="#FFFFFF"
+              fontSize="18"
+              fontWeight="700"
+              fontFamily="-apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+              letterSpacing="1"
+            >
+              TCGID.IO
+            </text>
+          </svg>
+        </Box>
         <Stack direction="row" spacing={1} alignItems="center">
           {!isAuthenticated && (
             <>
