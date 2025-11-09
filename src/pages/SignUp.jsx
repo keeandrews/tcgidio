@@ -128,7 +128,7 @@ export default function SignUp() {
     e.preventDefault()
     if (validateForm()) {
       try {
-        const response = await fetch('https://tcgid.io/api/signup', {
+        const response = await fetch('https://tcgid.io/api/auth/signup', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -148,18 +148,24 @@ export default function SignUp() {
         }
 
         if (response.status === 201) {
-          navigate('/signin', {
+          // Redirect to verify email page with email parameter and show success toast
+          navigate(`/verify?email=${encodeURIComponent(formData.email)}`, {
             state: {
-              toastMessage: 'Account created. Please sign in.',
+              toastMessage: 'Account created successfully. Please verify your email.',
               toastSeverity: 'success',
             },
           })
         } else if (response.status === 400) {
-          const message =
-            typeof (responseData && responseData.data) === 'string'
-              ? responseData.data
-              : 'Invalid request. Please check your details and try again.'
-          showToast(message, 'error')
+          const errorMessage = responseData?.data || 'Invalid request. Please check your details and try again.'
+          
+          // Check for specific error messages
+          if (errorMessage === 'Email already exists') {
+            showToast(errorMessage, 'error')
+          } else if (errorMessage.includes('Missing required fields')) {
+            showToast('Please complete the entire form before submitting.', 'error')
+          } else {
+            showToast(errorMessage, 'error')
+          }
         } else if (response.status === 500) {
           showToast('Internal server error', 'error')
         } else {
