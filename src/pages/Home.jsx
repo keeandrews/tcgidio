@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import Typography from '@mui/material/Typography'
 import Paper from '@mui/material/Paper'
 import Box from '@mui/material/Box'
-import Button from '@mui/material/Button'
 
 export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -94,19 +93,9 @@ export default function Home() {
       </Typography>
       <Box>
         <Typography>
-          This is the home page. Edit the global theme in <code>src/theme.js</code> to
-          change the look and feel site-wide.
+          This is the home page.
         </Typography>
-        {isAuthenticated && (
-          <Box sx={{ mt: 3 }}>
-            <Button 
-              variant="contained" 
-              onClick={handleLinkEbayClick}
-            >
-              Link eBay Account
-            </Button>
-          </Box>
-        )}
+        
       </Box>
     </Paper>
   )

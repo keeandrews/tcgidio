@@ -245,6 +245,13 @@ export default function Navigation() {
                 >
                   About
                 </MenuItem>
+                <MenuItem
+                  component={RouterLink}
+                  to="/integrations"
+                  onClick={handleMenuClose}
+                >
+                  Integrations
+                </MenuItem>
                 <MenuItem onClick={handleSignOut}>
                   Sign Out
                 </MenuItem>
