@@ -9,8 +9,7 @@ export default function About() {
         About
       </Typography>
       <Typography>
-        This starter uses React, Vite, React Router, and MUI with a single
-        theme file at <code>src/theme.js</code>.
+        This is the about page.
       </Typography>
     </Paper>
   )

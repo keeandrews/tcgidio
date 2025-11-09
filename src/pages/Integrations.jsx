@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import Typography from '@mui/material/Typography'
 import Paper from '@mui/material/Paper'
@@ -6,6 +6,8 @@ import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Stack from '@mui/material/Stack'
 import Alert from '@mui/material/Alert'
+import Snackbar from '@mui/material/Snackbar'
+import CircularProgress from '@mui/material/CircularProgress'
 import CancelIcon from '@mui/icons-material/Cancel'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import HomeIcon from '@mui/icons-material/Home'
@@ -16,6 +18,9 @@ export default function Integrations() {
   const navigate = useNavigate()
   const ebayStatus = searchParams.get('ebay')
   const [error, setError] = useState(null)
+  const [toastOpen, setToastOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [integration, setIntegration] = useState(null)
 
   const handleLinkEbayClick = async () => {
     try {
@@ -42,6 +47,58 @@ export default function Integrations() {
       }
     } catch (e) {
       setError('Unable to start eBay linking. Please try again.')
+    }
+  }
+
+  useEffect(() => {
+    // Only fetch integration status on the default integrations view
+    if (ebayStatus) return
+    const token = localStorage.getItem('token')
+    if (!token) return
+
+    let cancelled = false
+    const fetchIntegration = async () => {
+      try {
+        setLoading(true)
+        const res = await fetch('https://tcgid.io/api/auth/integrations/ebay', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+        if (!res.ok) {
+          throw new Error('Failed to load eBay integration')
+        }
+        const json = await res.json()
+        if (!cancelled) {
+          if (json?.success) {
+            setIntegration(json?.data || null)
+          } else {
+            setIntegration(null)
+          }
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError('Unable to load eBay integration. Please try again later.')
+          setToastOpen(true)
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+    fetchIntegration()
+    return () => {
+      cancelled = true
+    }
+  }, [ebayStatus])
+
+  const formatDateTime = (iso) => {
+    try {
+      return new Date(iso).toLocaleString()
+    } catch {
+      return iso
     }
   }
 
@@ -189,15 +246,92 @@ export default function Integrations() {
       <Typography variant="body1" color="text.secondary" paragraph>
         Connect your accounts to enhance your experience.
       </Typography>
-      
+
       <Box sx={{ mt: 4 }}>
         <Typography variant="h6" gutterBottom>
-          Available Integrations
+          eBay
         </Typography>
-        <Typography variant="body1">
-          Manage your connected accounts and services here.
-        </Typography>
+        {loading && (
+          <Stack direction="row" spacing={2} alignItems="center">
+            <CircularProgress size={20} />
+            <Typography variant="body2" color="text.secondary">
+              Checking your eBay integration...
+            </Typography>
+          </Stack>
+        )}
+
+        {!loading && integration && (
+          <Paper elevation={1} sx={{ p: 2, mt: 1 }}>
+            <Stack spacing={1}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                eBay account linked
+              </Typography>
+              <Typography variant="body2">
+                Username: <strong>{integration.ebay_username}</strong>
+              </Typography>
+              <Typography variant="body2">
+                User ID: <strong>{integration.ebay_user_id}</strong>
+              </Typography>
+              <Typography variant="body2">
+                Linked on: <strong>{formatDateTime(integration.created_at)}</strong>
+              </Typography>
+              <Typography variant="body2">
+                Access token expires: <strong>{formatDateTime(integration.access_token_expires_at)}</strong>
+              </Typography>
+              <Typography variant="body2">
+                Refresh token expires: <strong>{formatDateTime(integration.refresh_token_expires_at)}</strong>
+              </Typography>
+              <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
+                <Button
+                  variant="outlined"
+                  startIcon={<RefreshIcon />}
+                  onClick={() => window.location.reload()}
+                >
+                  Refresh
+                </Button>
+              </Stack>
+            </Stack>
+          </Paper>
+        )}
+
+        {!loading && !integration && (
+          <Paper elevation={1} sx={{ p: 2, mt: 1 }}>
+            <Stack spacing={2}>
+              <Typography variant="body2" color="text.secondary">
+                No eBay account linked yet.
+              </Typography>
+              {error && (
+                <Alert severity="error">
+                  <Typography variant="body2">{error}</Typography>
+                </Alert>
+              )}
+              <Stack direction="row" spacing={2}>
+                <Button variant="contained" onClick={handleLinkEbayClick}>
+                  Link eBay Account
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<RefreshIcon />}
+                  onClick={() => window.location.reload()}
+                >
+                  Refresh
+                </Button>
+              </Stack>
+            </Stack>
+          </Paper>
+        )}
       </Box>
+
+      <Snackbar
+        open={toastOpen}
+        autoHideDuration={4000}
+        onClose={() => setToastOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setToastOpen(false)} severity="error" sx={{ width: '100%' }}>
+          {error || 'Something went wrong. Please try again later.'}
+        </Alert>
+      </Snackbar>
     </Paper>
   )
 }
