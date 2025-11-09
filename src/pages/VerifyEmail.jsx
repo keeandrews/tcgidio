@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom'
 import Paper from '@mui/material/Paper'
 import Box from '@mui/material/Box'
 import TextField from '@mui/material/TextField'
@@ -7,13 +7,18 @@ import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
 import Stack from '@mui/material/Stack'
 import Alert from '@mui/material/Alert'
+import Snackbar from '@mui/material/Snackbar'
 
 export default function VerifyEmail() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const [code, setCode] = useState('')
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
+  const [snackbarOpen, setSnackbarOpen] = useState(false)
+  const [snackbarMessage, setSnackbarMessage] = useState('')
+  const [snackbarSeverity, setSnackbarSeverity] = useState('success')
 
   useEffect(() => {
     const emailParam = searchParams.get('email')
@@ -24,6 +29,24 @@ export default function VerifyEmail() {
       navigate('/signup')
     }
   }, [searchParams, navigate])
+
+  useEffect(() => {
+    const state = location.state
+    const message = state?.toastMessage || state?.toast?.message
+    const severity = state?.toastSeverity || state?.toast?.severity || 'success'
+    if (message) {
+      setSnackbarMessage(message)
+      setSnackbarSeverity(severity)
+      setSnackbarOpen(true)
+      // Clear the state so the toast doesn't reappear on back/forward
+      window.history.replaceState({}, document.title, location.pathname + location.search)
+    }
+  }, [location])
+
+  const handleCloseSnackbar = (event, reason) => {
+    if (reason === 'clickaway') return
+    setSnackbarOpen(false)
+  }
 
   const handleChange = (e) => {
     const value = e.target.value.replace(/\D/g, '').slice(0, 6) // Only allow digits, max 6
@@ -38,7 +61,7 @@ export default function VerifyEmail() {
       return
     }
     try {
-      const response = await fetch('https://tcgid.io/api/signup/verify', {
+      const response = await fetch('https://tcgid.io/api/auth/verify', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -50,9 +73,45 @@ export default function VerifyEmail() {
       })
 
       const responseData = await response.json()
-      console.log('Verify email response:', responseData)
+
+      if (response.ok && responseData.success) {
+        // 200 response with success - redirect to login with success toast
+        navigate('/signin', {
+          state: {
+            toastMessage: 'Your email has been verified successfully. Please login.',
+            toastSeverity: 'success',
+          },
+        })
+      } else if (response.status === 400) {
+        // 400 response - handle different error messages
+        const errorMessage = responseData.data || 'An error occurred'
+        
+        if (errorMessage === 'Invalid verification code or email') {
+          setSnackbarMessage('Invalid verification code or email')
+          setSnackbarSeverity('error')
+          setSnackbarOpen(true)
+        } else if (errorMessage === 'Missing required fields: email, code') {
+          setSnackbarMessage('Please complete the form')
+          setSnackbarSeverity('error')
+          setSnackbarOpen(true)
+        } else {
+          // Other 400 errors
+          setSnackbarMessage(errorMessage)
+          setSnackbarSeverity('error')
+          setSnackbarOpen(true)
+        }
+      } else {
+        // Any other error response
+        setSnackbarMessage('There was an error. Please try again later.')
+        setSnackbarSeverity('error')
+        setSnackbarOpen(true)
+      }
     } catch (error) {
       console.error('Verify email error:', error)
+      // Network or other errors
+      setSnackbarMessage('There was an error. Please try again later.')
+      setSnackbarSeverity('error')
+      setSnackbarOpen(true)
     }
   }
 
@@ -121,6 +180,16 @@ export default function VerifyEmail() {
           </Stack>
         </Box>
       </Paper>
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: '100%' }}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   )
 }
