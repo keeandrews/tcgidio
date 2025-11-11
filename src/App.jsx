@@ -7,6 +7,7 @@ import Home from './pages/Home'
 import About from './pages/About'
 import Privacy from './pages/Privacy'
 import Integrations from './pages/Integrations'
+import Inventory from './pages/Inventory'
 import SignUp from './pages/SignUp'
 import SignIn from './pages/SignIn'
 import VerifyEmail from './pages/VerifyEmail'
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="/about" element={<About />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/integrations" element={<Integrations />} />
+          <Route path="/inventory" element={<Inventory />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/verify" element={<VerifyEmail />} />
