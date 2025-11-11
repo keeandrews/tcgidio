@@ -252,6 +252,13 @@ export default function Navigation() {
                 >
                   Integrations
                 </MenuItem>
+                <MenuItem
+                  component={RouterLink}
+                  to="/inventory"
+                  onClick={handleMenuClose}
+                >
+                  Inventory
+                </MenuItem>
                 <MenuItem onClick={handleSignOut}>
                   Sign Out
                 </MenuItem>
