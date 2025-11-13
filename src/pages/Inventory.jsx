@@ -557,7 +557,7 @@ export default function Inventory() {
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: { xs: '40vh', sm: '60vh' } }}>
         <CircularProgress />
       </Box>
     )
@@ -565,12 +565,32 @@ export default function Inventory() {
 
   if (inventoryData.length === 0 && !syncing) {
     return (
-      <Box sx={{ py: 4 }}>
-        <Paper elevation={3} sx={{ p: 4, textAlign: 'center' }}>
-          <Typography variant="h5" gutterBottom>
+      <Box sx={{ py: { xs: 2, sm: 3, md: 4 } }}>
+        <Paper 
+          elevation={3} 
+          sx={{ 
+            p: { xs: 2, sm: 3, md: 4 }, 
+            textAlign: 'center',
+            borderRadius: 2
+          }}
+        >
+          <Typography 
+            variant="h5" 
+            gutterBottom
+            sx={{
+              fontSize: { xs: '1.25rem', sm: '1.5rem' }
+            }}
+          >
             No Inventory Found
           </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+          <Typography 
+            variant="body1" 
+            color="text.secondary" 
+            sx={{ 
+              mb: 3,
+              fontSize: { xs: '0.9rem', sm: '1rem' }
+            }}
+          >
             Click the sync button below to fetch your inventory from eBay
           </Typography>
           <Button
@@ -599,43 +619,77 @@ export default function Inventory() {
   }
 
   return (
-    <Box sx={{ py: 4 }}>
-      <Typography variant="h4" gutterBottom>
+    <Box sx={{ py: { xs: 2, sm: 3, md: 4 } }}>
+      <Typography 
+        variant="h4" 
+        gutterBottom
+        sx={{
+          fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2.125rem' },
+          mb: { xs: 2, sm: 3 }
+        }}
+      >
         Inventory Management
       </Typography>
 
       {/* Toolbar */}
-      <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
-        <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
+      <Paper 
+        elevation={2} 
+        sx={{ 
+          p: { xs: 1.5, sm: 2 }, 
+          mb: { xs: 2, sm: 3 },
+          borderRadius: 2
+        }}
+      >
+        <Stack 
+          direction={{ xs: 'column', sm: 'row' }} 
+          spacing={2} 
+          alignItems={{ xs: 'stretch', sm: 'center' }}
+        >
           <TextField
             placeholder={showSelectedOnly ? "Search selected items..." : "Search inventory..."}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onClick={() => setShowSelectedOnly(false)}
             size="small"
-            sx={{ flexGrow: 1, minWidth: 200 }}
+            sx={{ 
+              flexGrow: 1, 
+              minWidth: { xs: '100%', sm: 200 },
+              '& .MuiInputBase-root': {
+                fontSize: { xs: '0.9rem', sm: '1rem' }
+              }
+            }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon />
+                  <SearchIcon fontSize="small" />
                 </InputAdornment>
               ),
               endAdornment: searchQuery && (
                 <InputAdornment position="end">
                   <IconButton size="small" onClick={() => setSearchQuery('')}>
-                    <ClearIcon />
+                    <ClearIcon fontSize="small" />
                   </IconButton>
                 </InputAdornment>
               ),
             }}
           />
-          <Stack direction="row" spacing={2} alignItems="center">
+          <Stack 
+            direction={{ xs: 'column', sm: 'row' }} 
+            spacing={{ xs: 1, sm: 2 }} 
+            alignItems="center"
+            sx={{ width: { xs: '100%', sm: 'auto' } }}
+          >
             <Button
               variant="contained"
               color="secondary"
               startIcon={<CloudUploadIcon />}
               disabled={selected.length === 0}
               onClick={() => showSnackbar('Import functionality coming soon!', 'info')}
+              size="small"
+              fullWidth={{ xs: true, sm: false }}
+              sx={{
+                fontSize: { xs: '0.8rem', sm: '0.875rem' }
+              }}
             >
               Import
             </Button>
@@ -644,6 +698,10 @@ export default function Inventory() {
                 label={`Updated: ${formatDate(lastUpdated)}`} 
                 size="small"
                 color="default"
+                sx={{
+                  fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                  display: { xs: 'none', sm: 'flex' }
+                }}
               />
             </Tooltip>
             <Button
@@ -652,6 +710,11 @@ export default function Inventory() {
               startIcon={syncing ? <CircularProgress size={20} color="inherit" /> : <SyncIcon />}
               onClick={handleSync}
               disabled={syncing || polling}
+              size="small"
+              fullWidth={{ xs: true, sm: false }}
+              sx={{
+                fontSize: { xs: '0.8rem', sm: '0.875rem' }
+              }}
             >
               {syncing ? 'Syncing...' : 'Sync Inventory'}
             </Button>
@@ -678,8 +741,24 @@ export default function Inventory() {
       </Paper>
 
       {/* Table */}
-      <TableContainer component={Paper} elevation={3}>
-        <Table size="small">
+      <TableContainer 
+        component={Paper} 
+        elevation={3}
+        sx={{ 
+          borderRadius: 2,
+          overflowX: 'auto'
+        }}
+      >
+        <Table 
+          size="small"
+          sx={{
+            minWidth: { xs: 600, sm: 750 },
+            '& .MuiTableCell-root': {
+              fontSize: { xs: '0.75rem', sm: '0.875rem' },
+              py: { xs: 1, sm: 1.5 }
+            }
+          }}
+        >
           <TableHead>
             <TableRow>
               <TableCell padding="checkbox">
@@ -735,6 +814,16 @@ export default function Inventory() {
           labelDisplayedRows={({ from, to, count }) => 
             `${from}-${to} of ${count !== -1 ? count : `more than ${to}`}`
           }
+          sx={{
+            '.MuiTablePagination-toolbar': {
+              flexWrap: 'wrap',
+              px: { xs: 1, sm: 2 }
+            },
+            '.MuiTablePagination-selectLabel, .MuiTablePagination-displayedRows': {
+              fontSize: { xs: '0.75rem', sm: '0.875rem' },
+              m: { xs: 0.5, sm: 1 }
+            }
+          }}
         />
       </TableContainer>
 

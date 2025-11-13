@@ -155,41 +155,89 @@ export default function Integrations() {
   // Show success message if ebay=connected
   if (ebayStatus === 'connected') {
     return (
-      <Paper elevation={0} sx={{ p: 4, maxWidth: 600, mx: 'auto' }}>
-        <Box sx={{ textAlign: 'center', mb: 4 }}>
+      <Paper 
+        elevation={0} 
+        sx={{ 
+          p: { xs: 2, sm: 3, md: 4 }, 
+          maxWidth: { xs: '100%', sm: '100%', md: 600 }, 
+          mx: 'auto',
+          borderRadius: 2
+        }}
+      >
+        <Box sx={{ textAlign: 'center', mb: { xs: 3, sm: 4 } }}>
           <CheckCircleIcon 
             sx={{ 
-              fontSize: 80, 
+              fontSize: { xs: 60, sm: 70, md: 80 }, 
               color: 'success.main',
               mb: 2 
             }} 
           />
-          <Typography variant="h4" gutterBottom>
+          <Typography 
+            variant="h4" 
+            gutterBottom
+            sx={{
+              fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2.125rem' }
+            }}
+          >
             eBay Account Connected
           </Typography>
-          <Typography variant="body1" color="text.secondary" paragraph>
+          <Typography 
+            variant="body1" 
+            color="text.secondary" 
+            paragraph
+            sx={{
+              fontSize: { xs: '0.9rem', sm: '1rem' }
+            }}
+          >
             Your eBay account has been successfully connected to your account.
           </Typography>
         </Box>
 
         <Alert severity="success" sx={{ mb: 3 }}>
-          <Typography variant="body2">
+          <Typography 
+            variant="body2"
+            sx={{
+              fontSize: { xs: '0.8rem', sm: '0.875rem' }
+            }}
+          >
             Your eBay account is now connected and ready to use. You can start syncing your data and managing your listings.
           </Typography>
         </Alert>
 
         <Box sx={{ mb: 3 }}>
-          <Typography variant="body1" paragraph>
+          <Typography 
+            variant="body1" 
+            paragraph
+            sx={{
+              fontSize: { xs: '0.9rem', sm: '1rem' }
+            }}
+          >
             With your eBay account connected, you can now:
           </Typography>
-          <Box component="ul" sx={{ pl: 3, mb: 3 }}>
+          <Box 
+            component="ul" 
+            sx={{ 
+              pl: { xs: 2, sm: 3 }, 
+              mb: 3,
+              fontSize: { xs: '0.9rem', sm: '1rem' }
+            }}
+          >
             <li>Access your eBay listings and data</li>
             <li>Manage your trading card inventory</li>
             <li>Sync information between platforms</li>
           </Box>
         </Box>
 
-        <Stack direction="row" spacing={2} justifyContent="center" flexWrap="wrap">
+        <Stack 
+          direction={{ xs: 'column', sm: 'row' }} 
+          spacing={2} 
+          justifyContent="center"
+          sx={{
+            '& > button': {
+              minWidth: { xs: '100%', sm: 'auto' }
+            }
+          }}
+        >
           <Button
             variant="contained"
             startIcon={<HomeIcon />}
@@ -215,16 +263,30 @@ export default function Integrations() {
   // Show declined message if ebay=denied
   if (ebayStatus === 'denied') {
     return (
-      <Paper elevation={0} sx={{ p: 4, maxWidth: 600, mx: 'auto' }}>
-        <Box sx={{ textAlign: 'center', mb: 4 }}>
+      <Paper 
+        elevation={0} 
+        sx={{ 
+          p: { xs: 2, sm: 3, md: 4 }, 
+          maxWidth: { xs: '100%', sm: '100%', md: 600 }, 
+          mx: 'auto',
+          borderRadius: 2
+        }}
+      >
+        <Box sx={{ textAlign: 'center', mb: { xs: 3, sm: 4 } }}>
           <CancelIcon 
             sx={{ 
-              fontSize: 80, 
+              fontSize: { xs: 60, sm: 70, md: 80 }, 
               color: 'error.main',
               mb: 2 
             }} 
           />
-          <Typography variant="h4" gutterBottom>
+          <Typography 
+            variant="h4" 
+            gutterBottom
+            sx={{
+              fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2.125rem' }
+            }}
+          >
             Authorization Cancelled
           </Typography>
           <Typography variant="body1" color="text.secondary" paragraph>
@@ -258,7 +320,16 @@ export default function Integrations() {
           </Alert>
         )}
 
-        <Stack direction="row" spacing={2} justifyContent="center" flexWrap="wrap">
+        <Stack 
+          direction={{ xs: 'column', sm: 'row' }} 
+          spacing={2} 
+          justifyContent="center"
+          sx={{
+            '& > button': {
+              minWidth: { xs: '100%', sm: 'auto' }
+            }
+          }}
+        >
           <Button
             variant="contained"
             onClick={handleLinkEbayClick}
@@ -289,16 +360,43 @@ export default function Integrations() {
 
   // Default integrations page (if no query params or other status)
   return (
-    <Paper elevation={0} sx={{ p: 4, maxWidth: 800, mx: 'auto' }}>
-      <Typography variant="h4" gutterBottom>
+    <Paper 
+      elevation={0} 
+      sx={{ 
+        p: { xs: 2, sm: 3, md: 4 }, 
+        maxWidth: { xs: '100%', sm: '100%', md: 800 }, 
+        mx: 'auto',
+        borderRadius: 2
+      }}
+    >
+      <Typography 
+        variant="h4" 
+        gutterBottom
+        sx={{
+          fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2.125rem' }
+        }}
+      >
         Integrations
       </Typography>
-      <Typography variant="body1" color="text.secondary" paragraph>
+      <Typography 
+        variant="body1" 
+        color="text.secondary" 
+        paragraph
+        sx={{
+          fontSize: { xs: '0.9rem', sm: '1rem' }
+        }}
+      >
         Connect your accounts to enhance your experience.
       </Typography>
 
-      <Box sx={{ mt: 4 }}>
-        <Typography variant="h6" gutterBottom>
+      <Box sx={{ mt: { xs: 3, sm: 4 } }}>
+        <Typography 
+          variant="h6" 
+          gutterBottom
+          sx={{
+            fontSize: { xs: '1.1rem', sm: '1.25rem' }
+          }}
+        >
           eBay
         </Typography>
         {loading && (
@@ -331,7 +429,16 @@ export default function Integrations() {
               <Typography variant="body2">
                 Refresh token expires: <strong>{formatDateTime(integration.refresh_token_expires_at)}</strong>
               </Typography>
-              <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
+              <Stack 
+                direction={{ xs: 'column', sm: 'row' }} 
+                spacing={2} 
+                sx={{ 
+                  mt: 2,
+                  '& > button': {
+                    minWidth: { xs: '100%', sm: 'auto' }
+                  }
+                }}
+              >
                 <Button
                   variant="outlined"
                   startIcon={<RefreshIcon />}
@@ -365,7 +472,15 @@ export default function Integrations() {
                   <Typography variant="body2">{error}</Typography>
                 </Alert>
               )}
-              <Stack direction="row" spacing={2}>
+              <Stack 
+                direction={{ xs: 'column', sm: 'row' }} 
+                spacing={2}
+                sx={{
+                  '& > button': {
+                    minWidth: { xs: '100%', sm: 'auto' }
+                  }
+                }}
+              >
                 <Button variant="contained" onClick={handleLinkEbayClick}>
                   Link eBay Account
                 </Button>

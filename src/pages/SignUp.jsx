@@ -201,15 +201,31 @@ export default function SignUp() {
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        minHeight: '60vh',
+        minHeight: { xs: '50vh', sm: '60vh' },
+        px: { xs: 0, sm: 2 }
       }}
     >
-      <Paper elevation={3} sx={{ p: 4, maxWidth: 500, width: '100%' }}>
-        <Typography variant="h4" gutterBottom align="center">
+      <Paper 
+        elevation={3} 
+        sx={{ 
+          p: { xs: 2, sm: 3, md: 4 }, 
+          maxWidth: 500, 
+          width: '100%',
+          borderRadius: 2
+        }}
+      >
+        <Typography 
+          variant="h4" 
+          gutterBottom 
+          align="center"
+          sx={{
+            fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2.125rem' }
+          }}
+        >
           Sign Up
         </Typography>
-        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
-          <Stack spacing={3}>
+        <Box component="form" onSubmit={handleSubmit} sx={{ mt: { xs: 2, sm: 3 } }}>
+          <Stack spacing={{ xs: 2, sm: 3 }}>
             <TextField
               required
               fullWidth
@@ -273,13 +289,22 @@ export default function SignUp() {
               variant="contained"
               color="primary"
               size="large"
-              sx={{ mt: 2 }}
+              sx={{ 
+                mt: 2,
+                fontSize: { xs: '0.9rem', sm: '1rem' },
+                py: { xs: 1, sm: 1.5 }
+              }}
               disabled={!isFormValid()}
             >
               Complete Sign Up
             </Button>
             <Box sx={{ textAlign: 'center', mt: 2 }}>
-              <Typography variant="body2">
+              <Typography 
+                variant="body2"
+                sx={{
+                  fontSize: { xs: '0.8rem', sm: '0.875rem' }
+                }}
+              >
                 Already have an account?{' '}
                 <Link component={RouterLink} to="/signin" underline="hover">
                   Sign in

@@ -10,6 +10,17 @@ import MenuItem from '@mui/material/MenuItem'
 import { Link as RouterLink } from 'react-router-dom'
 import AccountCircleIcon from '@mui/icons-material/AccountCircle'
 import Box from '@mui/material/Box'
+import IconButton from '@mui/material/IconButton'
+import Drawer from '@mui/material/Drawer'
+import List from '@mui/material/List'
+import ListItem from '@mui/material/ListItem'
+import ListItemButton from '@mui/material/ListItemButton'
+import ListItemText from '@mui/material/ListItemText'
+import Divider from '@mui/material/Divider'
+import MenuIcon from '@mui/icons-material/Menu'
+import CloseIcon from '@mui/icons-material/Close'
+import useMediaQuery from '@mui/material/useMediaQuery'
+import { useTheme } from '@mui/material/styles'
 
 export default function Navigation() {
   const navigate = useNavigate()
@@ -18,6 +29,9 @@ export default function Navigation() {
   const [anchorEl, setAnchorEl] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuTimeout, setMenuTimeout] = useState(null)
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'))
 
   const checkAuthentication = () => {
     const token = localStorage.getItem('token')
@@ -116,158 +130,304 @@ export default function Navigation() {
     }
   }
 
+  const toggleMobileDrawer = (open) => (event) => {
+    if (event.type === 'keydown' && (event.key === 'Tab' || event.key === 'Shift')) {
+      return
+    }
+    setMobileDrawerOpen(open)
+  }
+
+  const handleDrawerLinkClick = () => {
+    setMobileDrawerOpen(false)
+  }
+
+  // Mobile drawer content
+  const mobileDrawerContent = (
+    <Box
+      sx={{ width: 280 }}
+      role="presentation"
+    >
+      <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="h6" color="primary">
+          TCGID.IO
+        </Typography>
+        <IconButton onClick={toggleMobileDrawer(false)}>
+          <CloseIcon />
+        </IconButton>
+      </Box>
+      <Divider />
+      <List>
+        {!isAuthenticated ? (
+          <>
+            <ListItem disablePadding>
+              <ListItemButton component={RouterLink} to="/" onClick={handleDrawerLinkClick}>
+                <ListItemText primary="Home" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton component={RouterLink} to="/about" onClick={handleDrawerLinkClick}>
+                <ListItemText primary="About" />
+              </ListItemButton>
+            </ListItem>
+            <Divider sx={{ my: 1 }} />
+            <ListItem disablePadding>
+              <ListItemButton component={RouterLink} to="/signin" onClick={handleDrawerLinkClick}>
+                <ListItemText primary="Sign In" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton component={RouterLink} to="/signup" onClick={handleDrawerLinkClick}>
+                <ListItemText primary="Sign Up" />
+              </ListItemButton>
+            </ListItem>
+          </>
+        ) : (
+          <>
+            <ListItem>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <AccountCircleIcon color="primary" />
+                <Typography variant="subtitle1">
+                  {userClaims?.first_name || 'User'}
+                </Typography>
+              </Stack>
+            </ListItem>
+            <Divider />
+            <ListItem disablePadding>
+              <ListItemButton component={RouterLink} to="/" onClick={handleDrawerLinkClick}>
+                <ListItemText primary="Home" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton component={RouterLink} to="/about" onClick={handleDrawerLinkClick}>
+                <ListItemText primary="About" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton component={RouterLink} to="/integrations" onClick={handleDrawerLinkClick}>
+                <ListItemText primary="Integrations" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton component={RouterLink} to="/inventory" onClick={handleDrawerLinkClick}>
+                <ListItemText primary="Inventory" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton component={RouterLink} to="/create-batch" onClick={handleDrawerLinkClick}>
+                <ListItemText primary="Create Batch" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton component={RouterLink} to="/create-inventory" onClick={handleDrawerLinkClick}>
+                <ListItemText primary="Create Inventory" />
+              </ListItemButton>
+            </ListItem>
+            <Divider sx={{ my: 1 }} />
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => { handleSignOut(); handleDrawerLinkClick(); }}>
+                <ListItemText primary="Sign Out" />
+              </ListItemButton>
+            </ListItem>
+          </>
+        )}
+      </List>
+    </Box>
+  )
+
   return (
-    <AppBar position="static" color="primary" enableColorOnDark>
-      <Toolbar>
-        <Box
-          component={RouterLink}
-          to="/"
-          sx={{
-            flexGrow: 1,
-            display: 'flex',
-            alignItems: 'center',
-            textDecoration: 'none',
-            cursor: 'pointer',
-            '&:hover': {
-              opacity: 0.8,
-            },
-          }}
-        >
-          <svg
-            width="200"
-            height="48"
-            viewBox="0 0 200 48"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
+    <>
+      <AppBar position="static" color="primary" enableColorOnDark>
+        <Toolbar>
+          <Box
+            component={RouterLink}
+            to="/"
+            sx={{
+              flexGrow: 1,
+              display: 'flex',
+              alignItems: 'center',
+              textDecoration: 'none',
+              cursor: 'pointer',
+              '&:hover': {
+                opacity: 0.8,
+              },
+            }}
           >
-            {/* Icon: simplified front card, subtle shadow for back card */}
-            <g>
-              {/* Shadow/back card outline (no overlap edges) */}
-              <rect
-                x="5"
-                y="8"
-                width="20"
-                height="28"
-                rx="3"
-                fill="none"
-                stroke="rgba(255,255,255,0.35)"
-                strokeWidth="2"
-              />
-              {/* Main front card */}
-              <rect
-                x="9"
-                y="10"
-                width="20"
-                height="28"
-                rx="3"
-                fill="none"
-                stroke="#FFFFFF"
-                strokeWidth="2"
-              />
-              {/* Circular "AI" dot */}
-              <circle cx="19" cy="17" r="2.3" fill="#FFFFFF" />
-              {/* Horizontal ID line */}
-              <rect x="15" y="24" width="8" height="2.2" rx="1" fill="#FFFFFF" />
-            </g>
-            {/* Text label */}
-            <text
-              x="45"
-              y="29"
-              fill="#FFFFFF"
-              fontSize="18"
-              fontWeight="700"
-              fontFamily="-apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-              letterSpacing="1"
+            <svg
+              width={isMobile ? '150' : '200'}
+              height="48"
+              viewBox="0 0 200 48"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              style={{ maxWidth: '100%' }}
             >
-              TCGID.IO
-            </text>
-          </svg>
-        </Box>
-        <Stack direction="row" spacing={1} alignItems="center">
-          {!isAuthenticated && (
-            <>
-              <Button color="inherit" component={RouterLink} to="/">Home</Button>
-              <Button color="inherit" component={RouterLink} to="/about">About</Button>
-              <Button color="inherit" component={RouterLink} to="/signin">Sign In</Button>
-              <Button color="inherit" component={RouterLink} to="/signup">Sign Up</Button>
-            </>
-          )}
-          {isAuthenticated && (
-            <Stack
-              direction="row"
-              spacing={1}
-              alignItems="center"
-              sx={{
-                ml: 'auto',
-                cursor: 'pointer',
-                '&:hover': {
-                  opacity: 0.8,
-                },
-              }}
-              onMouseEnter={handleMenuOpen}
-              onMouseLeave={handleMenuClose}
-            >
-              <AccountCircleIcon sx={{ fontSize: 28 }} />
-              <Typography variant="body1">
-                {userClaims?.first_name || 'User'}
-              </Typography>
-              <Menu
-                anchorEl={anchorEl}
-                open={menuOpen}
-                onClose={handleMenuClose}
-                MenuListProps={{
-                  onMouseEnter: handleMenuEnter,
-                  onMouseLeave: handleMenuClose,
-                }}
-                anchorOrigin={{
-                  vertical: 'bottom',
-                  horizontal: 'right',
-                }}
-                transformOrigin={{
-                  vertical: 'top',
-                  horizontal: 'right',
-                }}
-                sx={{
-                  mt: 1,
-                }}
+              {/* Icon: simplified front card, subtle shadow for back card */}
+              <g>
+                {/* Shadow/back card outline (no overlap edges) */}
+                <rect
+                  x="5"
+                  y="8"
+                  width="20"
+                  height="28"
+                  rx="3"
+                  fill="none"
+                  stroke="rgba(255,255,255,0.35)"
+                  strokeWidth="2"
+                />
+                {/* Main front card */}
+                <rect
+                  x="9"
+                  y="10"
+                  width="20"
+                  height="28"
+                  rx="3"
+                  fill="none"
+                  stroke="#FFFFFF"
+                  strokeWidth="2"
+                />
+                {/* Circular "AI" dot */}
+                <circle cx="19" cy="17" r="2.3" fill="#FFFFFF" />
+                {/* Horizontal ID line */}
+                <rect x="15" y="24" width="8" height="2.2" rx="1" fill="#FFFFFF" />
+              </g>
+              {/* Text label */}
+              <text
+                x="45"
+                y="29"
+                fill="#FFFFFF"
+                fontSize="18"
+                fontWeight="700"
+                fontFamily="-apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+                letterSpacing="1"
               >
-                <MenuItem
-                  component={RouterLink}
-                  to="/"
-                  onClick={handleMenuClose}
+                TCGID.IO
+              </text>
+            </svg>
+          </Box>
+          
+          {/* Desktop Navigation */}
+          {!isMobile && (
+            <Stack direction="row" spacing={1} alignItems="center">
+              {!isAuthenticated && (
+                <>
+                  <Button color="inherit" component={RouterLink} to="/">Home</Button>
+                  <Button color="inherit" component={RouterLink} to="/about">About</Button>
+                  <Button color="inherit" component={RouterLink} to="/signin">Sign In</Button>
+                  <Button color="inherit" component={RouterLink} to="/signup">Sign Up</Button>
+                </>
+              )}
+              {isAuthenticated && (
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  alignItems="center"
+                  sx={{
+                    ml: 'auto',
+                    cursor: 'pointer',
+                    '&:hover': {
+                      opacity: 0.8,
+                    },
+                  }}
+                  onMouseEnter={handleMenuOpen}
+                  onMouseLeave={handleMenuClose}
                 >
-                  Home
-                </MenuItem>
-                <MenuItem
-                  component={RouterLink}
-                  to="/about"
-                  onClick={handleMenuClose}
-                >
-                  About
-                </MenuItem>
-                <MenuItem
-                  component={RouterLink}
-                  to="/integrations"
-                  onClick={handleMenuClose}
-                >
-                  Integrations
-                </MenuItem>
-                <MenuItem
-                  component={RouterLink}
-                  to="/inventory"
-                  onClick={handleMenuClose}
-                >
-                  Inventory
-                </MenuItem>
-                <MenuItem onClick={handleSignOut}>
-                  Sign Out
-                </MenuItem>
-              </Menu>
+                  <AccountCircleIcon sx={{ fontSize: 28 }} />
+                  <Typography variant="body1">
+                    {userClaims?.first_name || 'User'}
+                  </Typography>
+                  <Menu
+                    anchorEl={anchorEl}
+                    open={menuOpen}
+                    onClose={handleMenuClose}
+                    MenuListProps={{
+                      onMouseEnter: handleMenuEnter,
+                      onMouseLeave: handleMenuClose,
+                    }}
+                    anchorOrigin={{
+                      vertical: 'bottom',
+                      horizontal: 'right',
+                    }}
+                    transformOrigin={{
+                      vertical: 'top',
+                      horizontal: 'right',
+                    }}
+                    sx={{
+                      mt: 1,
+                    }}
+                  >
+                    <MenuItem
+                      component={RouterLink}
+                      to="/"
+                      onClick={handleMenuClose}
+                    >
+                      Home
+                    </MenuItem>
+                    <MenuItem
+                      component={RouterLink}
+                      to="/about"
+                      onClick={handleMenuClose}
+                    >
+                      About
+                    </MenuItem>
+                    <MenuItem
+                      component={RouterLink}
+                      to="/integrations"
+                      onClick={handleMenuClose}
+                    >
+                      Integrations
+                    </MenuItem>
+                    <MenuItem
+                      component={RouterLink}
+                      to="/inventory"
+                      onClick={handleMenuClose}
+                    >
+                      Inventory
+                    </MenuItem>
+                    <MenuItem
+                      component={RouterLink}
+                      to="/create-batch"
+                      onClick={handleMenuClose}
+                    >
+                      Create Batch
+                    </MenuItem>
+                    <MenuItem
+                      component={RouterLink}
+                      to="/create-inventory"
+                      onClick={handleMenuClose}
+                    >
+                      Create Inventory
+                    </MenuItem>
+                    <MenuItem onClick={handleSignOut}>
+                      Sign Out
+                    </MenuItem>
+                  </Menu>
+                </Stack>
+              )}
             </Stack>
           )}
-        </Stack>
-      </Toolbar>
-    </AppBar>
+          
+          {/* Mobile Hamburger Menu */}
+          {isMobile && (
+            <IconButton
+              color="inherit"
+              aria-label="open menu"
+              edge="end"
+              onClick={toggleMobileDrawer(true)}
+            >
+              <MenuIcon />
+            </IconButton>
+          )}
+        </Toolbar>
+      </AppBar>
+      
+      {/* Mobile Drawer */}
+      <Drawer
+        anchor="right"
+        open={mobileDrawerOpen}
+        onClose={toggleMobileDrawer(false)}
+      >
+        {mobileDrawerContent}
+      </Drawer>
+    </>
   )
 }
 

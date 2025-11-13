@@ -91,16 +91,39 @@ export default function ForgotPassword() {
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        minHeight: '60vh',
+        minHeight: { xs: '50vh', sm: '60vh' },
+        px: { xs: 0, sm: 2 }
       }}
     >
-      <Paper elevation={3} sx={{ p: 4, maxWidth: 500, width: '100%' }}>
-        <Typography variant="h4" gutterBottom align="center">
+      <Paper 
+        elevation={3} 
+        sx={{ 
+          p: { xs: 2, sm: 3, md: 4 }, 
+          maxWidth: 500, 
+          width: '100%',
+          borderRadius: 2
+        }}
+      >
+        <Typography 
+          variant="h4" 
+          gutterBottom 
+          align="center"
+          sx={{
+            fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2.125rem' }
+          }}
+        >
           Forgot Password
         </Typography>
-        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
-          <Stack spacing={3}>
-            <Typography variant="body1" align="center" sx={{ mb: 2 }}>
+        <Box component="form" onSubmit={handleSubmit} sx={{ mt: { xs: 2, sm: 3 } }}>
+          <Stack spacing={{ xs: 2, sm: 3 }}>
+            <Typography 
+              variant="body1" 
+              align="center" 
+              sx={{ 
+                mb: 2,
+                fontSize: { xs: '0.9rem', sm: '1rem' }
+              }}
+            >
               Enter your email address and we'll send you a link to reset your password.
             </Typography>
 
@@ -130,7 +153,11 @@ export default function ForgotPassword() {
               variant="contained"
               color="primary"
               size="large"
-              sx={{ mt: 2 }}
+              sx={{ 
+                mt: 2,
+                fontSize: { xs: '0.9rem', sm: '1rem' },
+                py: { xs: 1, sm: 1.5 }
+              }}
               disabled={!email}
             >
               Send Reset Link
