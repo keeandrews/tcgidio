@@ -27,6 +27,13 @@ import Menu from '@mui/material/Menu'
 import MenuItem from '@mui/material/MenuItem'
 import MoreVertIcon from '@mui/icons-material/MoreVert'
 import Stack from '@mui/material/Stack'
+import AddIcon from '@mui/icons-material/Add'
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera'
+import UploadFileIcon from '@mui/icons-material/UploadFile'
+import Card from '@mui/material/Card'
+import CardContent from '@mui/material/CardContent'
+import CardActionArea from '@mui/material/CardActionArea'
+import Grid from '@mui/material/Grid'
 
 // Helper function to get the appropriate thumbnail size
 const getThumbnailUrl = (imageUrl, size = '300') => {
@@ -161,6 +168,7 @@ export default function Inventory() {
   const [loading, setLoading] = useState(true)
   const [anchorEl, setAnchorEl] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  const [creatingItem, setCreatingItem] = useState(false)
 
   // Check authentication
   useEffect(() => {
@@ -302,6 +310,41 @@ export default function Inventory() {
     navigate(`/inventory/${id}`)
   }
 
+  const handleCreateNewItem = async () => {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      showSnackbar('Authentication required', 'error')
+      navigate('/signin')
+      return
+    }
+
+    setCreatingItem(true)
+    try {
+      const response = await fetch('https://tcgid.io/api/v2/inventory', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success && data.data?.id) {
+        // Navigate to edit page with 'new=true' param
+        navigate(`/inventory/${data.data.id}?new=true`)
+      } else {
+        showSnackbar(data.data || 'Failed to create inventory item', 'error')
+      }
+    } catch (error) {
+      console.error('Error creating inventory item:', error)
+      showSnackbar('Network error while creating item', 'error')
+    } finally {
+      setCreatingItem(false)
+    }
+  }
+
   const isSelected = useCallback((id) => selected.indexOf(id) !== -1, [selected])
 
   const handleActionsClick = (event) => {
@@ -318,12 +361,12 @@ export default function Inventory() {
 
   const handleMatchItems = () => {
     handleActionsClose()
-    showSnackbar('Match Items functionality coming soon!', 'info')
+    showSnackbar('This feature is not currently enabled', 'info')
   }
 
   const handleAssessConditions = () => {
     handleActionsClose()
-    showSnackbar('Assess Conditions functionality coming soon!', 'info')
+    showSnackbar('This feature is not currently enabled', 'info')
   }
 
   const handleDeleteItems = async () => {
@@ -434,6 +477,191 @@ export default function Inventory() {
       >
         Inventory Management
       </Typography>
+
+      {/* Action Cards */}
+      <Grid container spacing={{ xs: 2, sm: 2, md: 3 }} sx={{ mb: { xs: 2, sm: 3 } }}>
+        <Grid item xs={12} sm={6} md={4}>
+          <Card 
+            elevation={2}
+            sx={{ 
+              height: '100%',
+              transition: 'all 0.2s',
+              '&:hover': {
+                elevation: 4,
+                transform: 'translateY(-2px)',
+              }
+            }}
+          >
+            <CardActionArea
+              onClick={handleCreateNewItem}
+              disabled={creatingItem}
+              sx={{ 
+                height: '100%',
+                p: { xs: 2, sm: 2.5, md: 3 }
+              }}
+            >
+              <CardContent sx={{ textAlign: 'center', p: 0 }}>
+                <Box
+                  sx={{
+                    width: { xs: 50, sm: 60 },
+                    height: { xs: 50, sm: 60 },
+                    borderRadius: '50%',
+                    bgcolor: 'primary.light',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    mx: 'auto',
+                    mb: 2
+                  }}
+                >
+                  {creatingItem ? (
+                    <CircularProgress size={30} />
+                  ) : (
+                    <AddIcon sx={{ fontSize: { xs: 28, sm: 32 }, color: 'primary.main' }} />
+                  )}
+                </Box>
+                <Typography 
+                  variant="h6" 
+                  gutterBottom
+                  sx={{
+                    fontSize: { xs: '1rem', sm: '1.1rem' },
+                    fontWeight: 600
+                  }}
+                >
+                  Create New Item
+                </Typography>
+                <Typography 
+                  variant="body2" 
+                  color="text.secondary"
+                  sx={{
+                    fontSize: { xs: '0.8rem', sm: '0.875rem' }
+                  }}
+                >
+                  Manually create a single inventory item
+                </Typography>
+              </CardContent>
+            </CardActionArea>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={4}>
+          <Card 
+            elevation={2}
+            sx={{ 
+              height: '100%',
+              transition: 'all 0.2s',
+              '&:hover': {
+                elevation: 4,
+                transform: 'translateY(-2px)',
+              }
+            }}
+          >
+            <CardActionArea
+              onClick={() => navigate('/create-inventory')}
+              sx={{ 
+                height: '100%',
+                p: { xs: 2, sm: 2.5, md: 3 }
+              }}
+            >
+              <CardContent sx={{ textAlign: 'center', p: 0 }}>
+                <Box
+                  sx={{
+                    width: { xs: 50, sm: 60 },
+                    height: { xs: 50, sm: 60 },
+                    borderRadius: '50%',
+                    bgcolor: 'secondary.light',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    mx: 'auto',
+                    mb: 2
+                  }}
+                >
+                  <PhotoCameraIcon sx={{ fontSize: { xs: 28, sm: 32 }, color: 'secondary.main' }} />
+                </Box>
+                <Typography 
+                  variant="h6" 
+                  gutterBottom
+                  sx={{
+                    fontSize: { xs: '1rem', sm: '1.1rem' },
+                    fontWeight: 600
+                  }}
+                >
+                  Create from Photos
+                </Typography>
+                <Typography 
+                  variant="body2" 
+                  color="text.secondary"
+                  sx={{
+                    fontSize: { xs: '0.8rem', sm: '0.875rem' }
+                  }}
+                >
+                  Upload photos to automatically create items
+                </Typography>
+              </CardContent>
+            </CardActionArea>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={4}>
+          <Card 
+            elevation={2}
+            sx={{ 
+              height: '100%',
+              transition: 'all 0.2s',
+              '&:hover': {
+                elevation: 4,
+                transform: 'translateY(-2px)',
+              }
+            }}
+          >
+            <CardActionArea
+              onClick={() => navigate('/create-batch')}
+              sx={{ 
+                height: '100%',
+                p: { xs: 2, sm: 2.5, md: 3 }
+              }}
+            >
+              <CardContent sx={{ textAlign: 'center', p: 0 }}>
+                <Box
+                  sx={{
+                    width: { xs: 50, sm: 60 },
+                    height: { xs: 50, sm: 60 },
+                    borderRadius: '50%',
+                    bgcolor: 'success.light',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    mx: 'auto',
+                    mb: 2
+                  }}
+                >
+                  <UploadFileIcon sx={{ fontSize: { xs: 28, sm: 32 }, color: 'success.main' }} />
+                </Box>
+                <Typography 
+                  variant="h6" 
+                  gutterBottom
+                  sx={{
+                    fontSize: { xs: '1rem', sm: '1.1rem' },
+                    fontWeight: 600
+                  }}
+                >
+                  Import Batch
+                </Typography>
+                <Typography 
+                  variant="body2" 
+                  color="text.secondary"
+                  sx={{
+                    fontSize: { xs: '0.8rem', sm: '0.875rem' }
+                  }}
+                >
+                  Upload a file to create multiple items
+                </Typography>
+              </CardContent>
+            </CardActionArea>
+          </Card>
+        </Grid>
+      </Grid>
 
       {/* Toolbar */}
       <Paper 

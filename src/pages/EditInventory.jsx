@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import Box from '@mui/material/Box'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
@@ -19,6 +19,8 @@ import Alert from '@mui/material/Alert'
 import IconButton from '@mui/material/IconButton'
 import CloseIcon from '@mui/icons-material/Close'
 import CloudUploadIcon from '@mui/icons-material/CloudUpload'
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
+import PsychologyIcon from '@mui/icons-material/Psychology'
 import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
@@ -59,6 +61,8 @@ const toMasterUrl = (imageUrl) => {
 export default function EditInventory() {
   const navigate = useNavigate()
   const { id } = useParams()
+  const [searchParams] = useSearchParams()
+  const isNewItem = searchParams.get('new') === 'true'
   const fileInputRef = useRef(null)
   
   const [loading, setLoading] = useState(true)
@@ -68,6 +72,8 @@ export default function EditInventory() {
   const [snackbarSeverity, setSnackbarSeverity] = useState('success')
   const [unsavedChanges, setUnsavedChanges] = useState(false)
   const [showCancelDialog, setShowCancelDialog] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   
   // Inventory data
   const [originalData, setOriginalData] = useState(null)
@@ -222,11 +228,9 @@ export default function EditInventory() {
   }
 
   const handleFileSelect = async (event) => {
-    console.log('File select triggered', event.target.files)
     if (!event.target.files || event.target.files.length === 0) return
     
     const files = Array.from(event.target.files)
-    console.log('Files selected:', files.length)
     
     const currentTotal = images.length + uploadingImages.length
     const remainingSlots = MAX_IMAGES - currentTotal
@@ -414,6 +418,13 @@ export default function EditInventory() {
       if (response.ok && data.success) {
         showSnackbar('Inventory item saved successfully', 'success')
         setUnsavedChanges(false)
+        
+        // If it was a new item, remove the 'new' parameter from URL to stop tracking as draft
+        if (isNewItem) {
+          // Update URL without the 'new' param
+          window.history.replaceState({}, '', `/inventory/${id}`)
+        }
+        
         // Navigate back after a short delay
         setTimeout(() => {
           navigate('/inventory')
@@ -432,14 +443,79 @@ export default function EditInventory() {
   const handleCancel = () => {
     if (unsavedChanges) {
       setShowCancelDialog(true)
+    } else if (isNewItem) {
+      // If it's a new item and no changes were made, still show dialog to confirm deletion
+      setShowCancelDialog(true)
     } else {
       navigate('/inventory')
     }
   }
 
-  const handleConfirmCancel = () => {
+  const handleConfirmCancel = async () => {
     setShowCancelDialog(false)
+    
+    // If it's a new item, delete it before navigating away
+    if (isNewItem) {
+      const token = localStorage.getItem('token')
+      if (token) {
+        try {
+          await fetch(`https://tcgid.io/api/v2/inventory/${id}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          })
+          // Don't show error/success message, just silently delete
+        } catch (error) {
+          console.error('Error deleting draft item:', error)
+          // Silently fail and navigate away anyway
+        }
+      }
+    }
+    
     navigate('/inventory')
+  }
+
+  const handleDeleteClick = () => {
+    setShowDeleteDialog(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      showSnackbar('Authentication required', 'error')
+      setShowDeleteDialog(false)
+      return
+    }
+
+    setDeleting(true)
+    try {
+      const response = await fetch(`https://tcgid.io/api/v2/inventory/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        showSnackbar('Inventory item deleted successfully', 'success')
+        // Navigate back after a short delay
+        setTimeout(() => {
+          navigate('/inventory')
+        }, 1000)
+      } else {
+        showSnackbar(data.data || 'Failed to delete inventory item', 'error')
+        setShowDeleteDialog(false)
+      }
+    } catch (error) {
+      console.error('Error deleting inventory item:', error)
+      showSnackbar('Network error while deleting', 'error')
+      setShowDeleteDialog(false)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const showSnackbar = (message, severity = 'success') => {
@@ -678,6 +754,53 @@ export default function EditInventory() {
               onChange={handleFileSelect}
             />
           </Button>
+        </Box>
+
+        <Divider sx={{ my: { xs: 3, sm: 4 } }} />
+
+        {/* AI Actions */}
+        <Box sx={{ mb: { xs: 3, sm: 4 } }}>
+          <Typography 
+            variant="h6" 
+            gutterBottom
+            sx={{
+              fontSize: { xs: '1.1rem', sm: '1.25rem' },
+              mb: 2
+            }}
+          >
+            AI-Powered Actions
+          </Typography>
+          <Stack 
+            direction={{ xs: 'column', sm: 'row' }} 
+            spacing={2}
+          >
+            <Button
+              variant="outlined"
+              color="secondary"
+              startIcon={<AutoAwesomeIcon />}
+              onClick={() => showSnackbar('This feature is not currently enabled', 'info')}
+              sx={{
+                fontSize: { xs: '0.9rem', sm: '1rem' },
+                py: { xs: 1, sm: 1.5 },
+                textTransform: 'none'
+              }}
+            >
+              Match Card with AI
+            </Button>
+            <Button
+              variant="outlined"
+              color="secondary"
+              startIcon={<PsychologyIcon />}
+              onClick={() => showSnackbar('This feature is not currently enabled', 'info')}
+              sx={{
+                fontSize: { xs: '0.9rem', sm: '1rem' },
+                py: { xs: 1, sm: 1.5 },
+                textTransform: 'none'
+              }}
+            >
+              Assess Condition with AI
+            </Button>
+          </Stack>
         </Box>
 
         <Divider sx={{ my: { xs: 3, sm: 4 } }} />
@@ -939,13 +1062,15 @@ export default function EditInventory() {
           spacing={2}
           sx={{ 
             mt: { xs: 3, sm: 4 }, 
-            justifyContent: 'flex-end' 
+            justifyContent: 'space-between',
+            alignItems: { xs: 'stretch', sm: 'center' }
           }}
         >
           <Button
             variant="outlined"
-            onClick={handleCancel}
-            disabled={saving}
+            color="error"
+            onClick={handleDeleteClick}
+            disabled={saving || deleting}
             sx={{
               width: { xs: '100%', sm: 'auto' },
               minWidth: { sm: '120px' },
@@ -953,21 +1078,41 @@ export default function EditInventory() {
               py: { xs: 1, sm: 1.5 }
             }}
           >
-            Cancel
+            Delete Item
           </Button>
-          <Button
-            variant="contained"
-            onClick={handleSave}
-            disabled={saving || uploadingImages.length > 0}
-            sx={{
-              width: { xs: '100%', sm: 'auto' },
-              minWidth: { sm: '120px' },
-              fontSize: { xs: '0.9rem', sm: '1rem' },
-              py: { xs: 1, sm: 1.5 }
-            }}
+          
+          <Stack 
+            direction={{ xs: 'column', sm: 'row' }} 
+            spacing={2}
+            sx={{ width: { xs: '100%', sm: 'auto' } }}
           >
-            {saving ? <CircularProgress size={24} /> : 'Save'}
-          </Button>
+            <Button
+              variant="outlined"
+              onClick={handleCancel}
+              disabled={saving || deleting}
+              sx={{
+                width: { xs: '100%', sm: 'auto' },
+                minWidth: { sm: '120px' },
+                fontSize: { xs: '0.9rem', sm: '1rem' },
+                py: { xs: 1, sm: 1.5 }
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              onClick={handleSave}
+              disabled={saving || deleting || uploadingImages.length > 0}
+              sx={{
+                width: { xs: '100%', sm: 'auto' },
+                minWidth: { sm: '120px' },
+                fontSize: { xs: '0.9rem', sm: '1rem' },
+                py: { xs: 1, sm: 1.5 }
+              }}
+            >
+              {saving ? <CircularProgress size={24} /> : 'Save'}
+            </Button>
+          </Stack>
         </Stack>
       </Paper>
 
@@ -979,11 +1124,14 @@ export default function EditInventory() {
         fullWidth
       >
         <DialogTitle sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
-          Discard Changes?
+          {isNewItem ? 'Delete Draft Item?' : 'Discard Changes?'}
         </DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}>
-            You have unsaved changes. Are you sure you want to discard them?
+            {isNewItem 
+              ? 'This item has not been saved. Do you want to delete this draft and return to the inventory list?'
+              : 'You have unsaved changes. Are you sure you want to discard them?'
+            }
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ p: { xs: 2, sm: 3 } }}>
@@ -999,7 +1147,43 @@ export default function EditInventory() {
             autoFocus
             sx={{ fontSize: { xs: '0.85rem', sm: '0.875rem' } }}
           >
-            Discard Changes
+            {isNewItem ? 'Delete Draft' : 'Discard Changes'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={showDeleteDialog}
+        onClose={() => !deleting && setShowDeleteDialog(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
+          Delete Inventory Item?
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}>
+            Are you sure you want to permanently delete this inventory item? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ p: { xs: 2, sm: 3 } }}>
+          <Button 
+            onClick={() => setShowDeleteDialog(false)}
+            disabled={deleting}
+            sx={{ fontSize: { xs: '0.85rem', sm: '0.875rem' } }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleConfirmDelete} 
+            color="error" 
+            variant="contained"
+            disabled={deleting}
+            autoFocus
+            sx={{ fontSize: { xs: '0.85rem', sm: '0.875rem' } }}
+          >
+            {deleting ? <CircularProgress size={20} color="inherit" /> : 'Delete Permanently'}
           </Button>
         </DialogActions>
       </Dialog>
