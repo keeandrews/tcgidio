@@ -29,7 +29,17 @@ import DialogContentText from '@mui/material/DialogContentText'
 import Grid from '@mui/material/Grid'
 import Stack from '@mui/material/Stack'
 import Divider from '@mui/material/Divider'
+import Chip from '@mui/material/Chip'
+import Autocomplete from '@mui/material/Autocomplete'
+import Checkbox from '@mui/material/Checkbox'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
+import useEbayAspects from '../hooks/useEbayAspects'
+import { 
+  mapEbayAspectsToFields, 
+  getVisibleOptions, 
+  validateAspectValues,
+  groupFieldsByCategory 
+} from '../utils/mapEbayAspectsToFields'
 
 const MAX_IMAGES = 24
 
@@ -97,6 +107,16 @@ export default function EditInventory() {
     stage: '',
     description: ''
   })
+  
+  // eBay aspects state
+  const [aspectValues, setAspectValues] = useState({})
+  
+  // Always fetch eBay aspects for category 183454
+  const { aspects, loading: aspectsLoading, error: aspectsError } = useEbayAspects(183454)
+  
+  // Map aspects to field configs
+  const aspectFields = aspects ? mapEbayAspectsToFields(aspects.aspects) : []
+  const groupedAspectFields = aspects ? groupFieldsByCategory(aspectFields) : {}
 
   // Check authentication
   useEffect(() => {
@@ -148,6 +168,11 @@ export default function EditInventory() {
           stage: inventoryData.stage || '',
           description: inventoryData.description || ''
         })
+        
+        // Populate eBay aspects if present
+        if (item.ebay_aspects || item.ebayAspects) {
+          setAspectValues(item.ebay_aspects || item.ebayAspects || {})
+        }
       } else {
         showSnackbar(data.data || 'Failed to fetch inventory item', 'error')
         navigate('/inventory')
@@ -187,6 +212,11 @@ export default function EditInventory() {
     if (field === 'card_type' && value !== 'Pokémon') {
       setFormData(prev => ({ ...prev, card_type: value, stage: '' }))
     }
+  }
+
+  const handleAspectChange = (aspectName, value) => {
+    setAspectValues(prev => ({ ...prev, [aspectName]: value }))
+    setUnsavedChanges(true)
   }
 
   const handleImageSelect = (index) => {
@@ -387,6 +417,15 @@ export default function EditInventory() {
       return
     }
 
+    // Validate eBay aspects
+    if (aspectFields.length > 0) {
+      const validationErrors = validateAspectValues(aspectFields, aspectValues)
+      if (validationErrors.length > 0) {
+        showSnackbar(validationErrors[0], 'error')
+        return
+      }
+    }
+
     setSaving(true)
     try {
       // Convert all form data to strings and build data object
@@ -401,16 +440,24 @@ export default function EditInventory() {
       // Ensure images use master URLs
       const masterImages = images.map(img => toMasterUrl(img))
 
+      // Build request body
+      const requestBody = {
+        data: dataToSave,
+        images: masterImages
+      }
+
+      // Include eBay aspects if any are set
+      if (Object.keys(aspectValues).length > 0) {
+        requestBody.ebay_aspects = aspectValues
+      }
+
       const response = await fetch(`https://tcgid.io/api/v2/inventory/${id}`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          data: dataToSave,
-          images: masterImages
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       const data = await response.json()
@@ -527,6 +574,145 @@ export default function EditInventory() {
   const handleCloseSnackbar = (event, reason) => {
     if (reason === 'clickaway') return
     setSnackbarOpen(false)
+  }
+
+  // Render a single aspect field based on its configuration
+  const renderAspectField = (field) => {
+    const value = aspectValues[field.aspectName] || (field.cardinality === 'MULTI' ? [] : '')
+    const visibleOptions = getVisibleOptions(field, aspectValues)
+    
+    switch (field.ui.fieldType) {
+      case 'select':
+        return (
+          <FormControl fullWidth size="medium" key={field.aspectName}>
+            <InputLabel required={field.required}>{field.aspectName}</InputLabel>
+            <Select
+              value={value}
+              label={field.aspectName}
+              onChange={(e) => handleAspectChange(field.aspectName, e.target.value)}
+              required={field.required}
+              sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}
+            >
+              <MenuItem value="">
+                <em>None</em>
+              </MenuItem>
+              {visibleOptions.map(option => (
+                <MenuItem key={option} value={option}>
+                  {option}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )
+      
+      case 'multi-select':
+        return (
+          <Autocomplete
+            key={field.aspectName}
+            multiple
+            freeSolo={field.mode === 'FREE_TEXT'}
+            options={visibleOptions}
+            value={Array.isArray(value) ? value : []}
+            onChange={(event, newValue) => handleAspectChange(field.aspectName, newValue)}
+            renderTags={(value, getTagProps) =>
+              value.map((option, index) => (
+                <Chip
+                  variant="outlined"
+                  label={option}
+                  {...getTagProps({ index })}
+                  key={option}
+                />
+              ))
+            }
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label={field.aspectName}
+                required={field.required}
+                size="medium"
+                sx={{
+                  '& .MuiInputBase-root': {
+                    fontSize: { xs: '0.9rem', sm: '1rem' }
+                  }
+                }}
+              />
+            )}
+          />
+        )
+      
+      case 'number':
+        return (
+          <TextField
+            key={field.aspectName}
+            label={field.aspectName}
+            fullWidth
+            type="number"
+            value={value}
+            onChange={(e) => handleAspectChange(field.aspectName, e.target.value)}
+            required={field.required}
+            size="medium"
+            inputProps={{ 
+              step: field.format === 'int32' ? 1 : 'any'
+            }}
+            sx={{
+              '& .MuiInputBase-root': {
+                fontSize: { xs: '0.9rem', sm: '1rem' }
+              }
+            }}
+          />
+        )
+      
+      case 'text':
+      default:
+        if (field.mode === 'FREE_TEXT' && visibleOptions.length > 0) {
+          // Autocomplete with suggestions
+          return (
+            <Autocomplete
+              key={field.aspectName}
+              freeSolo
+              options={visibleOptions}
+              value={value}
+              onChange={(event, newValue) => handleAspectChange(field.aspectName, newValue || '')}
+              onInputChange={(event, newValue) => {
+                if (event && event.type === 'change') {
+                  handleAspectChange(field.aspectName, newValue)
+                }
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label={field.aspectName}
+                  required={field.required}
+                  size="medium"
+                  sx={{
+                    '& .MuiInputBase-root': {
+                      fontSize: { xs: '0.9rem', sm: '1rem' }
+                    }
+                  }}
+                />
+              )}
+            />
+          )
+        } else {
+          // Regular text field
+          return (
+            <TextField
+              key={field.aspectName}
+              label={field.aspectName}
+              fullWidth
+              value={value}
+              onChange={(e) => handleAspectChange(field.aspectName, e.target.value)}
+              required={field.required}
+              size="medium"
+              sx={{
+                '& .MuiInputBase-root': {
+                  fontSize: { xs: '0.9rem', sm: '1rem' }
+                }
+              }}
+            />
+          )
+        }
+    }
   }
 
   if (loading) {
@@ -1055,6 +1241,67 @@ export default function EditInventory() {
             />
           </Grid>
         </Grid>
+
+        {/* eBay Aspects Section */}
+        <Divider sx={{ my: { xs: 3, sm: 4 } }} />
+        
+        <Box sx={{ mb: { xs: 3, sm: 4 } }}>
+          <Typography 
+            variant="h6" 
+            gutterBottom
+            sx={{
+              fontSize: { xs: '1.1rem', sm: '1.25rem' },
+              mb: 2
+            }}
+          >
+            eBay Product Aspects
+          </Typography>
+          
+          {aspectsLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+              <CircularProgress size={32} />
+            </Box>
+          ) : aspectsError ? (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              Failed to load eBay aspects: {aspectsError}
+            </Alert>
+          ) : aspects && aspectFields.length > 0 ? (
+            <>
+              <Typography 
+                variant="body2" 
+                color="text.secondary"
+                sx={{ mb: 3, fontSize: { xs: '0.85rem', sm: '0.875rem' } }}
+              >
+                These fields are specific to eBay listings and help improve discoverability. 
+                Fields marked with * are required by eBay.
+              </Typography>
+              
+              {Object.keys(groupedAspectFields).map(groupName => (
+                <Box key={groupName} sx={{ mb: 3 }}>
+                  <Typography 
+                    variant="subtitle1" 
+                    sx={{ 
+                      mb: 2, 
+                      fontWeight: 600,
+                      fontSize: { xs: '0.95rem', sm: '1rem' }
+                    }}
+                  >
+                    {groupName}
+                  </Typography>
+                  <Grid container spacing={{ xs: 2, sm: 2.5, md: 3 }}>
+                    {groupedAspectFields[groupName]
+                      .filter(field => !field.ui.hidden)
+                      .map(field => (
+                        <Grid item xs={12} sm={6} key={field.aspectName}>
+                          {renderAspectField(field)}
+                        </Grid>
+                      ))}
+                  </Grid>
+                </Box>
+              ))}
+            </>
+          ) : null}
+        </Box>
 
         {/* Action Buttons */}
         <Stack 
