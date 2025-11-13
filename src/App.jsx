@@ -8,6 +8,7 @@ import About from './pages/About'
 import Privacy from './pages/Privacy'
 import Integrations from './pages/Integrations'
 import Inventory from './pages/Inventory'
+import EditInventory from './pages/EditInventory'
 import CreateBatch from './pages/CreateBatch'
 import CreateInventory from './pages/CreateInventory'
 import SignUp from './pages/SignUp'
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/integrations" element={<Integrations />} />
           <Route path="/inventory" element={<Inventory />} />
+          <Route path="/inventory/:id" element={<EditInventory />} />
           <Route path="/create-batch" element={<CreateBatch />} />
           <Route path="/create-inventory" element={<CreateInventory />} />
           <Route path="/signup" element={<SignUp />} />

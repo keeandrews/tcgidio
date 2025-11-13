@@ -212,16 +212,6 @@ export default function Navigation() {
                 <ListItemText primary="Inventory" />
               </ListItemButton>
             </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton component={RouterLink} to="/create-batch" onClick={handleDrawerLinkClick}>
-                <ListItemText primary="Create Batch" />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton component={RouterLink} to="/create-inventory" onClick={handleDrawerLinkClick}>
-                <ListItemText primary="Create Inventory" />
-              </ListItemButton>
-            </ListItem>
             <Divider sx={{ my: 1 }} />
             <ListItem disablePadding>
               <ListItemButton onClick={() => { handleSignOut(); handleDrawerLinkClick(); }}>
@@ -381,20 +371,6 @@ export default function Navigation() {
                       onClick={handleMenuClose}
                     >
                       Inventory
-                    </MenuItem>
-                    <MenuItem
-                      component={RouterLink}
-                      to="/create-batch"
-                      onClick={handleMenuClose}
-                    >
-                      Create Batch
-                    </MenuItem>
-                    <MenuItem
-                      component={RouterLink}
-                      to="/create-inventory"
-                      onClick={handleMenuClose}
-                    >
-                      Create Inventory
                     </MenuItem>
                     <MenuItem onClick={handleSignOut}>
                       Sign Out

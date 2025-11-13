@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+api-documentation/
 
 # Build output
 dist/

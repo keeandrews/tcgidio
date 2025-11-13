@@ -12,129 +12,141 @@ import TableContainer from '@mui/material/TableContainer'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 import TableSortLabel from '@mui/material/TableSortLabel'
-import TablePagination from '@mui/material/TablePagination'
 import Checkbox from '@mui/material/Checkbox'
 import Snackbar from '@mui/material/Snackbar'
 import Alert from '@mui/material/Alert'
 import CircularProgress from '@mui/material/CircularProgress'
-import SyncIcon from '@mui/icons-material/Sync'
-import CloudUploadIcon from '@mui/icons-material/CloudUpload'
 import Chip from '@mui/material/Chip'
-import Stack from '@mui/material/Stack'
 import IconButton from '@mui/material/IconButton'
-import Tooltip from '@mui/material/Tooltip'
 import InputAdornment from '@mui/material/InputAdornment'
 import SearchIcon from '@mui/icons-material/Search'
 import ClearIcon from '@mui/icons-material/Clear'
 import CloseIcon from '@mui/icons-material/Close'
-import Link from '@mui/material/Link'
+import EditIcon from '@mui/icons-material/Edit'
+import Menu from '@mui/material/Menu'
+import MenuItem from '@mui/material/MenuItem'
+import MoreVertIcon from '@mui/icons-material/MoreVert'
+import Stack from '@mui/material/Stack'
+import AddIcon from '@mui/icons-material/Add'
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera'
+import UploadFileIcon from '@mui/icons-material/UploadFile'
+import Card from '@mui/material/Card'
+import CardContent from '@mui/material/CardContent'
+import CardActionArea from '@mui/material/CardActionArea'
+import Grid from '@mui/material/Grid'
 
-// IndexedDB helper functions
-const DB_NAME = 'InventoryDB'
-const DB_VERSION = 1
-const STORE_NAME = 'inventory'
-
-const openDB = () => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION)
-    
-    request.onerror = () => reject(request.error)
-    request.onsuccess = () => resolve(request.result)
-    
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME)
-      }
-    }
-  })
-}
-
-const saveToIndexedDB = async (key, value) => {
-  const db = await openDB()
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORE_NAME], 'readwrite')
-    const store = transaction.objectStore(STORE_NAME)
-    const request = store.put(value, key)
-    
-    request.onsuccess = () => resolve()
-    request.onerror = () => reject(request.error)
-  })
-}
-
-const getFromIndexedDB = async (key) => {
-  const db = await openDB()
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORE_NAME], 'readonly')
-    const store = transaction.objectStore(STORE_NAME)
-    const request = store.get(key)
-    
-    request.onsuccess = () => resolve(request.result)
-    request.onerror = () => reject(request.error)
-  })
+// Helper function to get the appropriate thumbnail size
+const getThumbnailUrl = (imageUrl, size = '300') => {
+  if (!imageUrl) return null
+  
+  // Check if the URL follows the expected pattern with "master.png"
+  if (imageUrl.includes('/master.png')) {
+    return imageUrl.replace('/master.png', `/${size}.png`)
+  }
+  
+  // If it doesn't follow the pattern, return null to show placeholder
+  return null
 }
 
 // Memoized table row component for performance
-const InventoryRow = React.memo(({ row, isItemSelected, handleClick }) => {
+const InventoryRow = React.memo(({ row, isItemSelected, handleClick, handleEdit }) => {
+  const thumbnailUrl = getThumbnailUrl(row.images?.[0], '300')
+  const title = row.inventory_data?.title || 'No title'
+  
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A'
+    try {
+      const date = new Date(dateString)
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    } catch (error) {
+      return 'Invalid date'
+    }
+  }
+
   return (
     <TableRow
       hover
-      onClick={() => handleClick(row.id)}
       role="checkbox"
       aria-checked={isItemSelected}
       selected={isItemSelected}
-      sx={{ cursor: 'pointer' }}
+      sx={{ 
+        cursor: 'pointer',
+        '& .MuiTableCell-root': {
+          py: { xs: 1, sm: 1.5 }
+        }
+      }}
     >
-      <TableCell padding="checkbox">
+      <TableCell padding="checkbox" onClick={() => handleClick(row.id)}>
         <Checkbox checked={isItemSelected} />
       </TableCell>
-      <TableCell>
-        <Box
-          component="img"
-          src={row.picture_gallery_url}
-          alt={row.title}
-          sx={{
-            width: 60,
-            height: 60,
-            objectFit: 'contain',
-            borderRadius: 1,
+      <TableCell padding="checkbox">
+        <IconButton
+          size="small"
+          onClick={(e) => {
+            e.stopPropagation()
+            handleEdit(row.id)
           }}
-          onError={(e) => {
-            e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60"><rect fill="%23ddd" width="60" height="60"/></svg>'
-          }}
-        />
-      </TableCell>
-      <TableCell>
-        <Link
-          href={row.listing_view_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
+          color="primary"
           sx={{
-            textDecoration: 'none',
-            color: 'primary.main',
             '&:hover': {
-              textDecoration: 'underline',
-            },
+              backgroundColor: 'primary.light',
+              color: 'primary.contrastText'
+            }
           }}
         >
-          <Typography variant="body2" noWrap sx={{ maxWidth: 300 }}>
-            {row.title}
-          </Typography>
-        </Link>
+          <EditIcon fontSize="small" />
+        </IconButton>
       </TableCell>
-      <TableCell>{row.sku}</TableCell>
-      <TableCell>{row.item_id}</TableCell>
-      <TableCell>
-        ${parseFloat(row.current_price_value || 0).toFixed(2)}
-      </TableCell>
-      <TableCell>{row.quantity_available}</TableCell>
-      <TableCell>
-        <Chip 
-          label={row.listing_type === 'FixedPriceItem' ? 'Buy It Now' : row.listing_type} 
-          size="small"
-          variant="outlined"
+      <TableCell onClick={() => handleClick(row.id)}>
+        <Box
+          component="img"
+          src={thumbnailUrl || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60"><rect fill="%23ddd" width="60" height="60"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%23999" font-size="10">No Image</text></svg>'}
+          alt={title}
+          sx={{
+            width: { xs: 50, sm: 60 },
+            height: { xs: 50, sm: 60 },
+            objectFit: 'contain',
+            borderRadius: 1,
+            border: '1px solid',
+            borderColor: 'divider'
+          }}
+          onError={(e) => {
+            e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60"><rect fill="%23ddd" width="60" height="60"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%23999" font-size="10">No Image</text></svg>'
+          }}
         />
+      </TableCell>
+      <TableCell onClick={() => handleClick(row.id)}>
+        <Typography 
+          variant="body2" 
+          noWrap 
+          sx={{ 
+            maxWidth: { xs: 150, sm: 250, md: 300 },
+            fontSize: { xs: '0.8rem', sm: '0.875rem' }
+          }}
+        >
+          {title}
+        </Typography>
+      </TableCell>
+      <TableCell 
+        onClick={() => handleClick(row.id)}
+        sx={{ 
+          display: { xs: 'none', md: 'table-cell' }
+        }}
+      >
+        <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+          {formatDate(row.created_at)}
+        </Typography>
+      </TableCell>
+      <TableCell onClick={() => handleClick(row.id)}>
+        <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+          {formatDate(row.updated_at)}
+        </Typography>
       </TableCell>
     </TableRow>
   )
@@ -147,20 +159,16 @@ export default function Inventory() {
   const [inventoryData, setInventoryData] = useState([])
   const [filteredData, setFilteredData] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
-  const [orderBy, setOrderBy] = useState('title')
-  const [order, setOrder] = useState('asc')
+  const [orderBy, setOrderBy] = useState('created_at')
+  const [order, setOrder] = useState('desc')
   const [selected, setSelected] = useState([])
-  const [lastUpdated, setLastUpdated] = useState(null)
-  const [syncing, setSyncing] = useState(false)
-  const [polling, setPolling] = useState(false)
   const [snackbarOpen, setSnackbarOpen] = useState(false)
   const [snackbarMessage, setSnackbarMessage] = useState('')
   const [snackbarSeverity, setSnackbarSeverity] = useState('success')
   const [loading, setLoading] = useState(true)
-  const [page, setPage] = useState(0)
-  const [rowsPerPage, setRowsPerPage] = useState(50)
-  const [showSelectedOnly, setShowSelectedOnly] = useState(false)
-  const [pollingIntervalId, setPollingIntervalId] = useState(null)
+  const [anchorEl, setAnchorEl] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+  const [creatingItem, setCreatingItem] = useState(false)
 
   // Check authentication
   useEffect(() => {
@@ -170,144 +178,73 @@ export default function Inventory() {
     }
   }, [navigate])
 
-  // Only fetch initial inventory on page load (no continuous polling)
+  // Fetch inventory on page load
   useEffect(() => {
-    const fetchInitialInventory = async () => {
-      const token = localStorage.getItem('token')
-      if (!token) return
-
-      try {
-        console.log('Fetching initial inventory metadata from API...')
-        const response = await fetch('https://tcgid.io/api/inventory/ebay', {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        })
-
-        const data = await response.json()
-        console.log('Inventory API Response:', data)
-
-        if (response.ok && data.success && data.data?.url && data.data?.job_id) {
-          const { url, job_id, updated_at } = data.data
-          console.log('Job ID:', job_id)
-
-          // Check if we already have this inventory cached
-          const cachedJobId = localStorage.getItem('inventory_job_id')
-          console.log('Cached Job ID:', cachedJobId)
-
-          if (cachedJobId === job_id) {
-            console.log('Inventory already cached, skipping download')
-            return
-          }
-
-          // Download the inventory JSON from presigned URL
-          console.log('Downloading inventory from presigned URL...')
-          try {
-            const inventoryResponse = await fetch(url, {
-              mode: 'cors',
-              credentials: 'omit',
-            })
-
-            if (inventoryResponse.ok) {
-              const inventoryData = await inventoryResponse.json()
-              console.log('Inventory data downloaded successfully')
-              console.log('Number of items:', inventoryData.length)
-
-              // Save to IndexedDB (can handle large datasets)
-              try {
-                await saveToIndexedDB(`${job_id}.json`, inventoryData)
-                localStorage.setItem('inventory_job_id', job_id)
-                localStorage.setItem('inventory_updated_at', updated_at)
-                console.log('Inventory saved to IndexedDB successfully')
-
-                // Reload inventory to display
-                await loadInventory()
-              } catch (saveError) {
-                console.error('Error saving to IndexedDB:', saveError)
-                showSnackbar('Failed to save inventory to storage', 'error')
-              }
-            }
-          } catch (corsError) {
-            console.error('CORS error downloading inventory:', corsError)
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching presigned URL:', error)
-      }
-    }
-
-    fetchInitialInventory()
+    fetchInventory()
   }, [])
 
-  // Load inventory from IndexedDB
-  useEffect(() => {
-    loadInventory()
-  }, [])
+  const fetchInventory = async () => {
+    const token = localStorage.getItem('token')
+    if (!token) return
 
-  const loadInventory = async () => {
-    const jobId = localStorage.getItem('inventory_job_id')
-    const updatedAt = localStorage.getItem('inventory_updated_at')
-    
-    if (jobId) {
-      try {
-        const data = await getFromIndexedDB(`${jobId}.json`)
-        if (data) {
-          console.log('Loaded inventory from IndexedDB:', data.length, 'items')
-          setInventoryData(data)
-          setFilteredData(data)
-          setLastUpdated(updatedAt)
-        }
-      } catch (error) {
-        console.error('Error loading inventory from IndexedDB:', error)
+    setLoading(true)
+    try {
+      const response = await fetch('https://tcgid.io/api/v2/inventory', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        setInventoryData(data.data || [])
+        setFilteredData(data.data || [])
+      } else {
+        showSnackbar(data.data || 'Failed to fetch inventory', 'error')
       }
+    } catch (error) {
+      console.error('Error fetching inventory:', error)
+      showSnackbar('Network error while fetching inventory', 'error')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
-  // Filter and search with debouncing (preserves selections)
+  // Filter and search
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
-      let dataToFilter = inventoryData
-
-      // If showing selected only, filter to selected items first
-      if (showSelectedOnly) {
-        dataToFilter = inventoryData.filter((item) => selected.includes(item.id))
-      }
-
-      // Apply search query
       if (!searchQuery.trim()) {
-        setFilteredData(dataToFilter)
-        setPage(0)
+        setFilteredData(inventoryData)
         return
       }
 
       const query = searchQuery.toLowerCase()
-      const filtered = dataToFilter.filter((item) => {
-        return (
-          item.title?.toLowerCase().includes(query) ||
-          item.sku?.toLowerCase().includes(query) ||
-          item.item_id?.toLowerCase().includes(query) ||
-          item.current_price_value?.toString().includes(query)
-        )
+      const filtered = inventoryData.filter((item) => {
+        const title = item.inventory_data?.title || ''
+        return title.toLowerCase().includes(query)
       })
       setFilteredData(filtered)
-      setPage(0)
-    }, 300) // 300ms debounce
+    }, 300)
 
     return () => clearTimeout(debounceTimer)
-  }, [searchQuery, inventoryData, showSelectedOnly, selected])
+  }, [searchQuery, inventoryData])
 
   // Sorting
   const sortedData = useMemo(() => {
     const comparator = (a, b) => {
-      let aValue = a[orderBy]
-      let bValue = b[orderBy]
+      let aValue, bValue
 
-      // Handle numeric values
-      if (orderBy === 'current_price_value' || orderBy === 'quantity' || orderBy === 'quantity_available') {
-        aValue = parseFloat(aValue) || 0
-        bValue = parseFloat(bValue) || 0
+      if (orderBy === 'title') {
+        aValue = a.inventory_data?.title || ''
+        bValue = b.inventory_data?.title || ''
+      } else if (orderBy === 'created_at' || orderBy === 'updated_at') {
+        aValue = new Date(a[orderBy]).getTime()
+        bValue = new Date(b[orderBy]).getTime()
+      } else {
+        aValue = a[orderBy]
+        bValue = b[orderBy]
       }
 
       // Handle string values
@@ -330,13 +267,6 @@ export default function Inventory() {
     return [...filteredData].sort(comparator)
   }, [filteredData, order, orderBy])
 
-  // Paginated data - only render current page
-  const paginatedData = useMemo(() => {
-    const startIndex = page * rowsPerPage
-    const endIndex = startIndex + rowsPerPage
-    return sortedData.slice(startIndex, endIndex)
-  }, [sortedData, page, rowsPerPage])
-
   const handleRequestSort = useCallback((property) => {
     setOrder((prevOrder) => {
       const isAsc = orderBy === property && prevOrder === 'asc'
@@ -347,14 +277,12 @@ export default function Inventory() {
 
   const handleSelectAllClick = useCallback((event) => {
     if (event.target.checked) {
-      const newSelected = paginatedData.map((item) => item.id)
-      setSelected((prev) => [...new Set([...prev, ...newSelected])])
+      const newSelected = sortedData.map((item) => item.id)
+      setSelected(newSelected)
       return
     }
-    // Only deselect items on current page
-    const currentPageIds = paginatedData.map((item) => item.id)
-    setSelected((prev) => prev.filter(id => !currentPageIds.includes(id)))
-  }, [paginatedData])
+    setSelected([])
+  }, [sortedData])
 
   const handleClick = useCallback((id) => {
     setSelected((prevSelected) => {
@@ -378,151 +306,128 @@ export default function Inventory() {
     })
   }, [])
 
-  const isSelected = useCallback((id) => selected.indexOf(id) !== -1, [selected])
+  const handleEdit = (id) => {
+    navigate(`/inventory/${id}`)
+  }
 
-  const handleChangePage = useCallback((event, newPage) => {
-    setPage(newPage)
-  }, [])
-
-  const handleChangeRowsPerPage = useCallback((event) => {
-    setRowsPerPage(parseInt(event.target.value, 10))
-    setPage(0)
-  }, [])
-
-  const handleSync = async () => {
+  const handleCreateNewItem = async () => {
     const token = localStorage.getItem('token')
     if (!token) {
-      showSnackbar('Please sign in to sync inventory', 'error')
+      showSnackbar('Authentication required', 'error')
       navigate('/signin')
       return
     }
 
-    setSyncing(true)
+    setCreatingItem(true)
     try {
-      const response = await fetch('https://tcgid.io/api/inventory/ebay/sync', {
-        method: 'GET',
+      const response = await fetch('https://tcgid.io/api/v2/inventory', {
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({}),
       })
 
       const data = await response.json()
 
-      if (response.ok && data.success) {
-        showSnackbar('Sync started successfully', 'info')
-        // Start polling for updates
-        startPolling()
+      if (response.ok && data.success && data.data?.id) {
+        // Navigate to edit page with 'new=true' param
+        navigate(`/inventory/${data.data.id}?new=true`)
       } else {
-        // Handle error or existing job
-        if (data.data?.message?.includes('already exists')) {
-          showSnackbar('Sync already in progress', 'info')
-          // Start polling anyway
-          startPolling()
-        } else {
-          showSnackbar(data.data?.message || 'Failed to start sync', 'error')
-          setSyncing(false)
-        }
+        showSnackbar(data.data || 'Failed to create inventory item', 'error')
       }
     } catch (error) {
-      console.error('Sync error:', error)
-      showSnackbar('Network error during sync', 'error')
-      setSyncing(false)
+      console.error('Error creating inventory item:', error)
+      showSnackbar('Network error while creating item', 'error')
+    } finally {
+      setCreatingItem(false)
     }
   }
 
-  const startPolling = useCallback(() => {
-    // Clear any existing polling interval
-    if (pollingIntervalId) {
-      clearInterval(pollingIntervalId)
+  const isSelected = useCallback((id) => selected.indexOf(id) !== -1, [selected])
+
+  const handleActionsClick = (event) => {
+    if (selected.length === 0) {
+      showSnackbar('Please select at least one item', 'warning')
+      return
+    }
+    setAnchorEl(event.currentTarget)
+  }
+
+  const handleActionsClose = () => {
+    setAnchorEl(null)
+  }
+
+  const handleMatchItems = () => {
+    handleActionsClose()
+    showSnackbar('This feature is not currently enabled', 'info')
+  }
+
+  const handleAssessConditions = () => {
+    handleActionsClose()
+    showSnackbar('This feature is not currently enabled', 'info')
+  }
+
+  const handleDeleteItems = async () => {
+    handleActionsClose()
+    
+    if (selected.length === 0) {
+      showSnackbar('Please select at least one item to delete', 'warning')
+      return
     }
 
-    const currentJobId = localStorage.getItem('inventory_job_id')
-    setPolling(true)
-    
-    const pollInterval = setInterval(async () => {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        clearInterval(pollInterval)
-        setPollingIntervalId(null)
-        setPolling(false)
-        setSyncing(false)
-        return
-      }
+    const confirmed = window.confirm(`Are you sure you want to delete ${selected.length} item(s)? This action cannot be undone.`)
+    if (!confirmed) return
 
+    setDeleting(true)
+    const token = localStorage.getItem('token')
+    if (!token) {
+      showSnackbar('Authentication required', 'error')
+      setDeleting(false)
+      return
+    }
+
+    const deletePromises = selected.map(async (id) => {
       try {
-        const response = await fetch('https://tcgid.io/api/inventory/ebay', {
-          method: 'GET',
+        const response = await fetch(`https://tcgid.io/api/v2/inventory/${id}`, {
+          method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`,
           },
         })
 
-        if (response.ok) {
-          const data = await response.json()
-          if (data.success && data.data?.job_id && data.data.job_id !== currentJobId) {
-            // New inventory available!
-            clearInterval(pollInterval)
-            setPollingIntervalId(null)
-            
-            // Download new inventory
-            try {
-              const inventoryResponse = await fetch(data.data.url, {
-                mode: 'cors',
-                credentials: 'omit',
-              })
-              if (inventoryResponse.ok) {
-                const inventoryData = await inventoryResponse.json()
-                // Save to IndexedDB
-                try {
-                  await saveToIndexedDB(`${data.data.job_id}.json`, inventoryData)
-                  localStorage.setItem('inventory_job_id', data.data.job_id)
-                  localStorage.setItem('inventory_updated_at', data.data.updated_at)
-                  
-                  // Reload inventory
-                  await loadInventory()
-                  showSnackbar('Inventory synced successfully!', 'success')
-                } catch (saveError) {
-                  console.error('Error saving to IndexedDB:', saveError)
-                  showSnackbar('Failed to save inventory to storage', 'error')
-                }
-              }
-            } catch (corsError) {
-              showSnackbar('CORS error: S3 bucket may not be configured for this origin', 'error')
-            }
-            
-            setPolling(false)
-            setSyncing(false)
-          }
-        } else {
-          // Error response
-          const errorData = await response.json()
-          showSnackbar(errorData.data?.message || 'Error checking sync status', 'error')
-          clearInterval(pollInterval)
-          setPollingIntervalId(null)
-          setPolling(false)
-          setSyncing(false)
+        const data = await response.json()
+        
+        if (!response.ok || !data.success) {
+          return { id, success: false, error: data.data || 'Unknown error' }
         }
+        
+        return { id, success: true }
       } catch (error) {
-        console.error('Polling error:', error)
-        clearInterval(pollInterval)
-        setPollingIntervalId(null)
-        setPolling(false)
-        setSyncing(false)
+        console.error(`Error deleting item ${id}:`, error)
+        return { id, success: false, error: error.message }
       }
-    }, 30000) // Poll every 30 seconds
+    })
 
-    // Store interval ID in state
-    setPollingIntervalId(pollInterval)
-  }, [pollingIntervalId])
-
-  // Cleanup polling on unmount
-  useEffect(() => {
-    return () => {
-      if (pollingIntervalId) {
-        clearInterval(pollingIntervalId)
-      }
+    const results = await Promise.all(deletePromises)
+    const failures = results.filter(r => !r.success)
+    
+    setDeleting(false)
+    
+    // Refresh inventory
+    await fetchInventory()
+    
+    // Clear selections
+    setSelected([])
+    
+    // Show results
+    if (failures.length > 0) {
+      showSnackbar(`Failed to delete ${failures.length} item(s)`, 'error')
+    } else {
+      showSnackbar(`Successfully deleted ${results.length} item(s)`, 'success')
     }
-  }, [pollingIntervalId])
+  }
 
   const showSnackbar = (message, severity = 'success') => {
     setSnackbarMessage(message)
@@ -535,85 +440,27 @@ export default function Inventory() {
     setSnackbarOpen(false)
   }
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'Never'
-    try {
-      const date = new Date(dateString)
-      return date.toLocaleString()
-    } catch (error) {
-      return dateString
-    }
-  }
-
   const columns = [
-    { id: 'picture_gallery_url', label: 'Image', sortable: false, width: 80 },
-    { id: 'title', label: 'Title', sortable: true, width: 300 },
-    { id: 'sku', label: 'SKU', sortable: true, width: 100 },
-    { id: 'item_id', label: 'Item ID', sortable: true, width: 120 },
-    { id: 'current_price_value', label: 'Price', sortable: true, width: 100 },
-    { id: 'quantity_available', label: 'Qty', sortable: true, width: 80 },
-    { id: 'listing_type', label: 'Type', sortable: true, width: 120 },
+    { id: 'checkbox', label: '', sortable: false, width: 48 },
+    { id: 'edit', label: '', sortable: false, width: 48 },
+    { id: 'image', label: 'Image', sortable: false, width: 80 },
+    { id: 'title', label: 'Title', sortable: true, width: 250 },
+    { id: 'created_at', label: 'Created', sortable: true, width: 150, hideOnMobile: true },
+    { id: 'updated_at', label: 'Updated', sortable: true, width: 150 },
   ]
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: { xs: '40vh', sm: '60vh' } }}>
+      <Box 
+        sx={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          minHeight: { xs: '40vh', sm: '60vh' },
+          py: { xs: 2, sm: 3, md: 4 }
+        }}
+      >
         <CircularProgress />
-      </Box>
-    )
-  }
-
-  if (inventoryData.length === 0 && !syncing) {
-    return (
-      <Box sx={{ py: { xs: 2, sm: 3, md: 4 } }}>
-        <Paper 
-          elevation={3} 
-          sx={{ 
-            p: { xs: 2, sm: 3, md: 4 }, 
-            textAlign: 'center',
-            borderRadius: 2
-          }}
-        >
-          <Typography 
-            variant="h5" 
-            gutterBottom
-            sx={{
-              fontSize: { xs: '1.25rem', sm: '1.5rem' }
-            }}
-          >
-            No Inventory Found
-          </Typography>
-          <Typography 
-            variant="body1" 
-            color="text.secondary" 
-            sx={{ 
-              mb: 3,
-              fontSize: { xs: '0.9rem', sm: '1rem' }
-            }}
-          >
-            Click the sync button below to fetch your inventory from eBay
-          </Typography>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={syncing ? <CircularProgress size={20} color="inherit" /> : <SyncIcon />}
-            onClick={handleSync}
-            disabled={syncing}
-            size="large"
-          >
-            {syncing ? 'Syncing...' : 'Sync Inventory'}
-          </Button>
-        </Paper>
-        <Snackbar
-          open={snackbarOpen}
-          autoHideDuration={6000}
-          onClose={handleCloseSnackbar}
-          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-        >
-          <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: '100%' }}>
-            {snackbarMessage}
-          </Alert>
-        </Snackbar>
       </Box>
     )
   }
@@ -631,29 +478,212 @@ export default function Inventory() {
         Inventory Management
       </Typography>
 
+      {/* Action Cards */}
+      <Grid container spacing={{ xs: 2, sm: 2, md: 3 }} sx={{ mb: { xs: 2, sm: 3 } }}>
+        <Grid item xs={12} sm={6} md={4}>
+          <Card 
+            elevation={2}
+            sx={{ 
+              height: '100%',
+              transition: 'all 0.2s',
+              '&:hover': {
+                elevation: 4,
+                transform: 'translateY(-2px)',
+              }
+            }}
+          >
+            <CardActionArea
+              onClick={handleCreateNewItem}
+              disabled={creatingItem}
+              sx={{ 
+                height: '100%',
+                p: { xs: 2, sm: 2.5, md: 3 }
+              }}
+            >
+              <CardContent sx={{ textAlign: 'center', p: 0 }}>
+                <Box
+                  sx={{
+                    width: { xs: 50, sm: 60 },
+                    height: { xs: 50, sm: 60 },
+                    borderRadius: '50%',
+                    bgcolor: 'primary.light',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    mx: 'auto',
+                    mb: 2
+                  }}
+                >
+                  {creatingItem ? (
+                    <CircularProgress size={30} />
+                  ) : (
+                    <AddIcon sx={{ fontSize: { xs: 28, sm: 32 }, color: 'primary.main' }} />
+                  )}
+                </Box>
+                <Typography 
+                  variant="h6" 
+                  gutterBottom
+                  sx={{
+                    fontSize: { xs: '1rem', sm: '1.1rem' },
+                    fontWeight: 600
+                  }}
+                >
+                  Create New Item
+                </Typography>
+                <Typography 
+                  variant="body2" 
+                  color="text.secondary"
+                  sx={{
+                    fontSize: { xs: '0.8rem', sm: '0.875rem' }
+                  }}
+                >
+                  Manually create a single inventory item
+                </Typography>
+              </CardContent>
+            </CardActionArea>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={4}>
+          <Card 
+            elevation={2}
+            sx={{ 
+              height: '100%',
+              transition: 'all 0.2s',
+              '&:hover': {
+                elevation: 4,
+                transform: 'translateY(-2px)',
+              }
+            }}
+          >
+            <CardActionArea
+              onClick={() => navigate('/create-inventory')}
+              sx={{ 
+                height: '100%',
+                p: { xs: 2, sm: 2.5, md: 3 }
+              }}
+            >
+              <CardContent sx={{ textAlign: 'center', p: 0 }}>
+                <Box
+                  sx={{
+                    width: { xs: 50, sm: 60 },
+                    height: { xs: 50, sm: 60 },
+                    borderRadius: '50%',
+                    bgcolor: 'secondary.light',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    mx: 'auto',
+                    mb: 2
+                  }}
+                >
+                  <PhotoCameraIcon sx={{ fontSize: { xs: 28, sm: 32 }, color: 'secondary.main' }} />
+                </Box>
+                <Typography 
+                  variant="h6" 
+                  gutterBottom
+                  sx={{
+                    fontSize: { xs: '1rem', sm: '1.1rem' },
+                    fontWeight: 600
+                  }}
+                >
+                  Create from Photos
+                </Typography>
+                <Typography 
+                  variant="body2" 
+                  color="text.secondary"
+                  sx={{
+                    fontSize: { xs: '0.8rem', sm: '0.875rem' }
+                  }}
+                >
+                  Upload photos to automatically create items
+                </Typography>
+              </CardContent>
+            </CardActionArea>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={4}>
+          <Card 
+            elevation={2}
+            sx={{ 
+              height: '100%',
+              transition: 'all 0.2s',
+              '&:hover': {
+                elevation: 4,
+                transform: 'translateY(-2px)',
+              }
+            }}
+          >
+            <CardActionArea
+              onClick={() => navigate('/create-batch')}
+              sx={{ 
+                height: '100%',
+                p: { xs: 2, sm: 2.5, md: 3 }
+              }}
+            >
+              <CardContent sx={{ textAlign: 'center', p: 0 }}>
+                <Box
+                  sx={{
+                    width: { xs: 50, sm: 60 },
+                    height: { xs: 50, sm: 60 },
+                    borderRadius: '50%',
+                    bgcolor: 'success.light',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    mx: 'auto',
+                    mb: 2
+                  }}
+                >
+                  <UploadFileIcon sx={{ fontSize: { xs: 28, sm: 32 }, color: 'success.main' }} />
+                </Box>
+                <Typography 
+                  variant="h6" 
+                  gutterBottom
+                  sx={{
+                    fontSize: { xs: '1rem', sm: '1.1rem' },
+                    fontWeight: 600
+                  }}
+                >
+                  Import Batch
+                </Typography>
+                <Typography 
+                  variant="body2" 
+                  color="text.secondary"
+                  sx={{
+                    fontSize: { xs: '0.8rem', sm: '0.875rem' }
+                  }}
+                >
+                  Upload a file to create multiple items
+                </Typography>
+              </CardContent>
+            </CardActionArea>
+          </Card>
+        </Grid>
+      </Grid>
+
       {/* Toolbar */}
       <Paper 
         elevation={2} 
         sx={{ 
-          p: { xs: 1.5, sm: 2 }, 
+          p: { xs: 1.5, sm: 2, md: 2.5 }, 
           mb: { xs: 2, sm: 3 },
           borderRadius: 2
         }}
       >
         <Stack 
-          direction={{ xs: 'column', sm: 'row' }} 
-          spacing={2} 
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={2}
           alignItems={{ xs: 'stretch', sm: 'center' }}
         >
           <TextField
-            placeholder={showSelectedOnly ? "Search selected items..." : "Search inventory..."}
+            placeholder="Search by title..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onClick={() => setShowSelectedOnly(false)}
             size="small"
             sx={{ 
-              flexGrow: 1, 
-              minWidth: { xs: '100%', sm: 200 },
+              flexGrow: 1,
               '& .MuiInputBase-root': {
                 fontSize: { xs: '0.9rem', sm: '1rem' }
               }
@@ -673,159 +703,140 @@ export default function Inventory() {
               ),
             }}
           />
-          <Stack 
-            direction={{ xs: 'column', sm: 'row' }} 
-            spacing={{ xs: 1, sm: 2 }} 
-            alignItems="center"
-            sx={{ width: { xs: '100%', sm: 'auto' } }}
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<MoreVertIcon />}
+            onClick={handleActionsClick}
+            disabled={selected.length === 0 || deleting}
+            size="small"
+            sx={{
+              fontSize: { xs: '0.85rem', sm: '0.875rem' },
+              minWidth: { xs: '100%', sm: '120px' }
+            }}
           >
-            <Button
-              variant="contained"
-              color="secondary"
-              startIcon={<CloudUploadIcon />}
-              disabled={selected.length === 0}
-              onClick={() => showSnackbar('Import functionality coming soon!', 'info')}
-              size="small"
-              fullWidth={{ xs: true, sm: false }}
-              sx={{
-                fontSize: { xs: '0.8rem', sm: '0.875rem' }
-              }}
-            >
-              Import
-            </Button>
-            <Tooltip title="Last updated">
-              <Chip 
-                label={`Updated: ${formatDate(lastUpdated)}`} 
-                size="small"
-                color="default"
-                sx={{
-                  fontSize: { xs: '0.7rem', sm: '0.75rem' },
-                  display: { xs: 'none', sm: 'flex' }
-                }}
-              />
-            </Tooltip>
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={syncing ? <CircularProgress size={20} color="inherit" /> : <SyncIcon />}
-              onClick={handleSync}
-              disabled={syncing || polling}
-              size="small"
-              fullWidth={{ xs: true, sm: false }}
-              sx={{
-                fontSize: { xs: '0.8rem', sm: '0.875rem' }
-              }}
-            >
-              {syncing ? 'Syncing...' : 'Sync Inventory'}
-            </Button>
-          </Stack>
+            Actions
+          </Button>
+          <Menu
+            anchorEl={anchorEl}
+            open={Boolean(anchorEl)}
+            onClose={handleActionsClose}
+          >
+            <MenuItem onClick={handleMatchItems}>Match Items</MenuItem>
+            <MenuItem onClick={handleAssessConditions}>Assess Conditions</MenuItem>
+            <MenuItem onClick={handleDeleteItems} sx={{ color: 'error.main' }}>
+              Delete Items
+            </MenuItem>
+          </Menu>
         </Stack>
         {selected.length > 0 && (
           <Box sx={{ mt: 2 }}>
             <Chip 
-              label={`${selected.length} items selected`} 
+              label={`${selected.length} item${selected.length > 1 ? 's' : ''} selected`} 
               color="primary"
-              onClick={() => {
-                setShowSelectedOnly(true)
-                setSearchQuery('')
-              }}
-              onDelete={() => {
-                setSelected([])
-                setShowSelectedOnly(false)
-              }}
+              onDelete={() => setSelected([])}
               deleteIcon={<CloseIcon />}
-              sx={{ cursor: 'pointer' }}
+              size="small"
+              sx={{
+                fontSize: { xs: '0.75rem', sm: '0.8125rem' }
+              }}
             />
           </Box>
         )}
       </Paper>
 
       {/* Table */}
-      <TableContainer 
-        component={Paper} 
-        elevation={3}
-        sx={{ 
-          borderRadius: 2,
-          overflowX: 'auto'
-        }}
-      >
-        <Table 
-          size="small"
-          sx={{
-            minWidth: { xs: 600, sm: 750 },
-            '& .MuiTableCell-root': {
-              fontSize: { xs: '0.75rem', sm: '0.875rem' },
-              py: { xs: 1, sm: 1.5 }
-            }
+      {sortedData.length === 0 ? (
+        <Paper 
+          elevation={3} 
+          sx={{ 
+            p: { xs: 3, sm: 4, md: 5 }, 
+            textAlign: 'center',
+            borderRadius: 2
           }}
         >
-          <TableHead>
-            <TableRow>
-              <TableCell padding="checkbox">
-                <Checkbox
-                  indeterminate={
-                    selected.length > 0 && 
-                    paginatedData.some(row => selected.includes(row.id)) &&
-                    !paginatedData.every(row => selected.includes(row.id))
-                  }
-                  checked={paginatedData.length > 0 && paginatedData.every(row => selected.includes(row.id))}
-                  onChange={handleSelectAllClick}
-                />
-              </TableCell>
-              {columns.map((column) => (
-                <TableCell
-                  key={column.id}
-                  sx={{ fontWeight: 'bold', minWidth: column.width }}
-                >
-                  {column.sortable ? (
-                    <TableSortLabel
-                      active={orderBy === column.id}
-                      direction={orderBy === column.id ? order : 'asc'}
-                      onClick={() => handleRequestSort(column.id)}
-                    >
-                      {column.label}
-                    </TableSortLabel>
-                  ) : (
-                    column.label
-                  )}
-                </TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {paginatedData.map((row) => (
-              <InventoryRow
-                key={row.id}
-                row={row}
-                isItemSelected={isSelected(row.id)}
-                handleClick={handleClick}
-              />
-            ))}
-          </TableBody>
-        </Table>
-        <TablePagination
-          rowsPerPageOptions={[25, 50, 100, 200]}
-          component="div"
-          count={filteredData.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={handleChangePage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
-          labelDisplayedRows={({ from, to, count }) => 
-            `${from}-${to} of ${count !== -1 ? count : `more than ${to}`}`
-          }
-          sx={{
-            '.MuiTablePagination-toolbar': {
-              flexWrap: 'wrap',
-              px: { xs: 1, sm: 2 }
-            },
-            '.MuiTablePagination-selectLabel, .MuiTablePagination-displayedRows': {
-              fontSize: { xs: '0.75rem', sm: '0.875rem' },
-              m: { xs: 0.5, sm: 1 }
-            }
+          <Typography 
+            variant="h6" 
+            gutterBottom
+            sx={{
+              fontSize: { xs: '1.1rem', sm: '1.25rem' }
+            }}
+          >
+            {searchQuery ? 'No items match your search' : 'No inventory items found'}
+          </Typography>
+          <Typography 
+            variant="body2" 
+            color="text.secondary"
+            sx={{
+              fontSize: { xs: '0.85rem', sm: '0.875rem' }
+            }}
+          >
+            {searchQuery ? 'Try adjusting your search terms' : 'Create your first inventory item to get started'}
+          </Typography>
+        </Paper>
+      ) : (
+        <TableContainer 
+          component={Paper} 
+          elevation={3}
+          sx={{ 
+            borderRadius: 2,
+            overflowX: 'auto'
           }}
-        />
-      </TableContainer>
+        >
+          <Table 
+            size="small"
+            sx={{
+              minWidth: { xs: 500, sm: 650 },
+            }}
+          >
+            <TableHead>
+              <TableRow>
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    indeterminate={selected.length > 0 && selected.length < sortedData.length}
+                    checked={sortedData.length > 0 && selected.length === sortedData.length}
+                    onChange={handleSelectAllClick}
+                  />
+                </TableCell>
+                {columns.slice(1).map((column) => (
+                  <TableCell
+                    key={column.id}
+                    sx={{ 
+                      fontWeight: 'bold', 
+                      minWidth: column.width,
+                      display: column.hideOnMobile ? { xs: 'none', md: 'table-cell' } : 'table-cell',
+                      fontSize: { xs: '0.8rem', sm: '0.875rem' }
+                    }}
+                  >
+                    {column.sortable ? (
+                      <TableSortLabel
+                        active={orderBy === column.id}
+                        direction={orderBy === column.id ? order : 'asc'}
+                        onClick={() => handleRequestSort(column.id)}
+                      >
+                        {column.label}
+                      </TableSortLabel>
+                    ) : (
+                      column.label
+                    )}
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {sortedData.map((row) => (
+                <InventoryRow
+                  key={row.id}
+                  row={row}
+                  isItemSelected={isSelected(row.id)}
+                  handleClick={handleClick}
+                  handleEdit={handleEdit}
+                />
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
 
       <Snackbar
         open={snackbarOpen}
@@ -833,11 +844,17 @@ export default function Inventory() {
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: '100%' }}>
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbarSeverity} 
+          sx={{ 
+            width: '100%',
+            fontSize: { xs: '0.85rem', sm: '0.875rem' }
+          }}
+        >
           {snackbarMessage}
         </Alert>
       </Snackbar>
     </Box>
   )
 }
-
