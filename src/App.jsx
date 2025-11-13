@@ -8,6 +8,8 @@ import About from './pages/About'
 import Privacy from './pages/Privacy'
 import Integrations from './pages/Integrations'
 import Inventory from './pages/Inventory'
+import CreateBatch from './pages/CreateBatch'
+import CreateInventory from './pages/CreateInventory'
 import SignUp from './pages/SignUp'
 import SignIn from './pages/SignIn'
 import VerifyEmail from './pages/VerifyEmail'
@@ -18,13 +20,24 @@ export default function App() {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <Navigation />
-      <Container component="main" sx={{ py: 4, flexGrow: 1 }}>
+      <Container 
+        component="main" 
+        sx={{ 
+          py: { xs: 2, sm: 3, md: 4 },
+          px: { xs: 2, sm: 3, md: 3 },
+          flexGrow: 1,
+          width: '100%',
+          maxWidth: { xs: '100%', sm: '600px', md: '900px', lg: '1200px', xl: '1536px' }
+        }}
+      >
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/about" element={<About />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/integrations" element={<Integrations />} />
           <Route path="/inventory" element={<Inventory />} />
+          <Route path="/create-batch" element={<CreateBatch />} />
+          <Route path="/create-inventory" element={<CreateInventory />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/verify" element={<VerifyEmail />} />

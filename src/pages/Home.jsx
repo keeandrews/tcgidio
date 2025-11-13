@@ -87,13 +87,31 @@ export default function Home() {
   }
 
   return (
-    <Paper elevation={0} sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        Welcome
+    <Paper 
+      elevation={0} 
+      sx={{ 
+        p: { xs: 2, sm: 3, md: 4 },
+        borderRadius: 2
+      }}
+    >
+      <Typography 
+        variant="h4" 
+        gutterBottom
+        sx={{
+          fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2.125rem' }
+        }}
+      >
+        Welcome to TCGID.IO
       </Typography>
       <Box>
-        <Typography>
-          This is the home page.
+        <Typography 
+          variant="body1"
+          sx={{
+            fontSize: { xs: '0.9rem', sm: '1rem' },
+            lineHeight: 1.6
+          }}
+        >
+          Manage your trading card inventory with ease. Connect your eBay account, sync your listings, and create new inventory batches.
         </Typography>
         
       </Box>
