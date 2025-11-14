@@ -21,6 +21,7 @@ import CloseIcon from '@mui/icons-material/Close'
 import CloudUploadIcon from '@mui/icons-material/CloudUpload'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import PsychologyIcon from '@mui/icons-material/Psychology'
+import DescriptionIcon from '@mui/icons-material/Description'
 import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
@@ -32,6 +33,10 @@ import Divider from '@mui/material/Divider'
 import Chip from '@mui/material/Chip'
 import Autocomplete from '@mui/material/Autocomplete'
 import Checkbox from '@mui/material/Checkbox'
+import Accordion from '@mui/material/Accordion'
+import AccordionSummary from '@mui/material/AccordionSummary'
+import AccordionDetails from '@mui/material/AccordionDetails'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import useEbayAspects from '../hooks/useEbayAspects'
 import { 
@@ -84,9 +89,14 @@ export default function EditInventory() {
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [expandedSections, setExpandedSections] = useState({
+    basicInfo: true, // Basic Info expanded by default
+    // Other subsections will be added dynamically based on groupedAspectFields
+  })
   
   // Inventory data
   const [originalData, setOriginalData] = useState(null)
+  const [inventoryData, setInventoryData] = useState(null)
   const [images, setImages] = useState([])
   const [selectedImage, setSelectedImage] = useState(0)
   const [uploadingImages, setUploadingImages] = useState([])
@@ -98,6 +108,7 @@ export default function EditInventory() {
     graded: 'No',
     professional_grader: '',
     grade: '',
+    certification_number: '',
     condition: '',
     card_name: '',
     character: '',
@@ -108,10 +119,10 @@ export default function EditInventory() {
     description: ''
   })
   
-  // eBay aspects state
+  // Aspect values state
   const [aspectValues, setAspectValues] = useState({})
   
-  // Always fetch eBay aspects for category 183454
+  // Always fetch aspects for category 183454
   const { aspects, loading: aspectsLoading, error: aspectsError } = useEbayAspects(183454)
   
   // Map aspects to field configs
@@ -130,6 +141,82 @@ export default function EditInventory() {
   useEffect(() => {
     fetchInventoryItem()
   }, [id])
+
+  // Set default values for autographed when aspects load (if not already set)
+  useEffect(() => {
+    if (!aspects || !aspects.aspects) return
+    
+    setAspectValues(prev => {
+      // Only set default if autographed is not already set
+      if (!prev['Autographed'] && !prev['autographed']) {
+        return { ...prev, 'Autographed': 'No' }
+      }
+      return prev
+    })
+  }, [aspects])
+
+  // Map aspect values from inventory_data when both are loaded
+  useEffect(() => {
+    if (!inventoryData || !aspects || !aspects.aspects) return
+
+    // Compute aspect fields inside the effect to avoid dependency issues
+    const fields = mapEbayAspectsToFields(aspects.aspects)
+    if (!fields.length) return
+
+    // List of form fields that should not be treated as aspect values
+    const formFieldKeys = [
+      'title', 'game', 'graded', 'professional_grader', 'grade', 
+      'certification_number', 'condition', 'card_name', 'character', 
+      'card_type', 'language', 'finish', 'stage', 'description'
+    ]
+
+    const mappedAspectValues = {}
+    
+    // Extract aspect values from inventory_data
+    fields.forEach(field => {
+      const aspectName = field.aspectName
+      const value = inventoryData[aspectName]
+      
+      // Skip if value doesn't exist or is in form fields
+      if (value === undefined || value === null || value === '' || formFieldKeys.includes(aspectName)) {
+        return
+      }
+
+      // Handle multi-select fields (arrays stored as comma-separated strings)
+      if (field.cardinality === 'MULTI') {
+        if (typeof value === 'string' && value.includes(',')) {
+          // Split comma-separated string back into array
+          mappedAspectValues[aspectName] = value.split(',').map(v => v.trim()).filter(v => v)
+        } else if (Array.isArray(value)) {
+          // Already an array
+          mappedAspectValues[aspectName] = value
+        } else if (value) {
+          // Single value, wrap in array
+          mappedAspectValues[aspectName] = [String(value)]
+        }
+      } else {
+        // Single value field
+        mappedAspectValues[aspectName] = String(value)
+      }
+    })
+
+    // Normalize autographed key (use 'Autographed' consistently)
+    if (mappedAspectValues['autographed']) {
+      mappedAspectValues['Autographed'] = mappedAspectValues['autographed']
+      delete mappedAspectValues['autographed']
+    }
+    
+    // Set autographed from inventory data if not already mapped
+    if (!mappedAspectValues['Autographed']) {
+      const autographedValue = inventoryData['Autographed'] || inventoryData['autographed']
+      if (autographedValue) {
+        mappedAspectValues['Autographed'] = String(autographedValue)
+      }
+    }
+
+    // Only update if we found aspect values or need to set defaults
+    setAspectValues(prev => ({ ...prev, ...mappedAspectValues }))
+  }, [inventoryData, aspects])
 
   const fetchInventoryItem = async () => {
     const token = localStorage.getItem('token')
@@ -152,27 +239,24 @@ export default function EditInventory() {
         setImages(item.images || [])
         
         // Populate form with inventory_data
-        const inventoryData = item.inventory_data || {}
+        const inventoryDataObj = item.inventory_data || {}
+        setInventoryData(inventoryDataObj)
         setFormData({
-          title: inventoryData.title || '',
-          game: inventoryData.game || 'Pokémon TCG',
-          graded: inventoryData.graded || 'No',
-          professional_grader: inventoryData.professional_grader || '',
-          grade: inventoryData.grade || '',
-          condition: inventoryData.condition || '',
-          card_name: inventoryData.card_name || '',
-          character: inventoryData.character || '',
-          card_type: inventoryData.card_type || '',
-          language: inventoryData.language || '',
-          finish: inventoryData.finish || '',
-          stage: inventoryData.stage || '',
-          description: inventoryData.description || ''
+          title: inventoryDataObj.title || '',
+          game: inventoryDataObj.game || 'Pokémon TCG',
+          graded: inventoryDataObj.graded || 'No',
+          professional_grader: inventoryDataObj.professional_grader || '',
+          grade: inventoryDataObj.grade || '',
+          certification_number: inventoryDataObj.certification_number || '',
+          condition: inventoryDataObj.condition || '',
+          card_name: inventoryDataObj.card_name || '',
+          character: inventoryDataObj.character || '',
+          card_type: inventoryDataObj.card_type || '',
+          language: inventoryDataObj.language || '',
+          finish: inventoryDataObj.finish || '',
+          stage: inventoryDataObj.stage || '',
+          description: inventoryDataObj.description || ''
         })
-        
-        // Populate eBay aspects if present
-        if (item.ebay_aspects || item.ebayAspects) {
-          setAspectValues(item.ebay_aspects || item.ebayAspects || {})
-        }
       } else {
         showSnackbar(data.data || 'Failed to fetch inventory item', 'error')
         navigate('/inventory')
@@ -193,13 +277,16 @@ export default function EditInventory() {
     // Clear dependent fields when changing graded status
     if (field === 'graded') {
       if (value === 'No') {
+        // Hide graded fields, show condition field
         setFormData(prev => ({
           ...prev,
           graded: value,
           professional_grader: '',
-          grade: ''
+          grade: '',
+          certification_number: ''
         }))
       } else {
+        // Hide condition field, show graded fields
         setFormData(prev => ({
           ...prev,
           graded: value,
@@ -215,7 +302,57 @@ export default function EditInventory() {
   }
 
   const handleAspectChange = (aspectName, value) => {
-    setAspectValues(prev => ({ ...prev, [aspectName]: value }))
+    setAspectValues(prev => {
+      const newValues = { ...prev, [aspectName]: value }
+      
+      // Clear dependent fields when changing graded status
+      if (aspectName === 'Graded' || aspectName === 'graded') {
+        if (value === 'No' || value === 'no') {
+          // Clear graded-related fields when hiding them
+          delete newValues['Professional Grader']
+          delete newValues['professional_grader']
+          delete newValues['Grade']
+          delete newValues['grade']
+          delete newValues['Certification Number']
+          delete newValues['certification_number']
+          // Also clear formData fields
+          setFormData(prevForm => ({
+            ...prevForm,
+            graded: String(value),
+            professional_grader: '',
+            grade: '',
+            certification_number: ''
+          }))
+        } else {
+          // Clear condition field when showing graded fields
+          delete newValues['Card Condition']
+          delete newValues['card_condition']
+          delete newValues['Condition']
+          delete newValues['condition']
+          // Also clear formData condition field
+          setFormData(prevForm => ({
+            ...prevForm,
+            graded: String(value),
+            condition: ''
+          }))
+        }
+      }
+      
+      // Clear dependent fields when changing autographed status
+      if (aspectName === 'Autographed' || aspectName === 'autographed') {
+        if (value === 'No' || value === 'no') {
+          // Clear autograph fields when hiding them
+          delete newValues['Autograph Authentication']
+          delete newValues['autograph_authentication']
+          delete newValues['Autograph Authentication Number']
+          delete newValues['autograph_authentication_number']
+          delete newValues['Autograph Format']
+          delete newValues['autograph_format']
+        }
+      }
+      
+      return newValues
+    })
     setUnsavedChanges(true)
   }
 
@@ -417,7 +554,7 @@ export default function EditInventory() {
       return
     }
 
-    // Validate eBay aspects
+    // Validate aspect values
     if (aspectFields.length > 0) {
       const validationErrors = validateAspectValues(aspectFields, aspectValues)
       if (validationErrors.length > 0) {
@@ -437,6 +574,24 @@ export default function EditInventory() {
         }
       })
 
+      // Merge aspect values into data object (convert arrays to strings if needed)
+      Object.keys(aspectValues).forEach(key => {
+        const value = aspectValues[key]
+        // Skip empty values
+        if (value === '' || value === null || value === undefined) {
+          return
+        }
+        // Handle array values (multi-select fields)
+        if (Array.isArray(value)) {
+          // Only include non-empty arrays
+          if (value.length > 0) {
+            dataToSave[key] = value.join(', ')
+          }
+        } else {
+          dataToSave[key] = String(value)
+        }
+      })
+
       // Ensure images use master URLs
       const masterImages = images.map(img => toMasterUrl(img))
 
@@ -444,11 +599,6 @@ export default function EditInventory() {
       const requestBody = {
         data: dataToSave,
         images: masterImages
-      }
-
-      // Include eBay aspects if any are set
-      if (Object.keys(aspectValues).length > 0) {
-        requestBody.ebay_aspects = aspectValues
       }
 
       const response = await fetch(`https://tcgid.io/api/v2/inventory/${id}`, {
@@ -574,6 +724,84 @@ export default function EditInventory() {
   const handleCloseSnackbar = (event, reason) => {
     if (reason === 'clickaway') return
     setSnackbarOpen(false)
+  }
+
+  const handleAccordionChange = (section) => (event, isExpanded) => {
+    setExpandedSections(prev => ({ ...prev, [section]: isExpanded }))
+  }
+
+  const isSectionExpanded = (section) => {
+    return expandedSections[section] ?? false
+  }
+
+  // Determine if a field should be visible based on graded/autographed status
+  const isFieldVisible = (fieldName) => {
+    const fieldNameLower = fieldName.toLowerCase().trim()
+    
+    // Get graded value (could be in formData or aspectValues)
+    const gradedValue = formData.graded || aspectValues['Graded'] || aspectValues['graded'] || 'No'
+    const gradedIsNo = gradedValue === 'No' || gradedValue === 'no' || gradedValue === ''
+    
+    // Get autographed value (likely in aspectValues)
+    const autographedValue = aspectValues['Autographed'] || aspectValues['autographed'] || 'No'
+    const autographedIsNo = autographedValue === 'No' || autographedValue === 'no' || autographedValue === ''
+    
+    // Fields to hide when graded is "No" - check for exact matches and partial matches
+    const gradedFields = [
+      'professional grader', 'professional_grader', 'professionalgrader',
+      'grade',
+      'certification number', 'certification_number', 'certificationnumber'
+    ]
+    
+    // Fields to hide when graded is "Yes" - check for exact matches and partial matches
+    const conditionFields = [
+      'card condition', 'card_condition', 'cardcondition',
+      'condition'
+    ]
+    
+    // Fields to hide when autographed is "No"
+    const autographFields = [
+      'autograph authentication', 'autograph_authentication', 'autographauthentication',
+      'autograph authentication number', 'autograph_authentication_number', 'autographauthenticationnumber',
+      'autograph format', 'autograph_format', 'autographformat'
+    ]
+    
+    // Always show "Graded" and "Autographed" fields themselves
+    if (fieldNameLower === 'graded' || fieldNameLower === 'autographed') {
+      return true
+    }
+    
+    // Check graded-related visibility
+    if (gradedIsNo) {
+      // Hide graded fields when graded is "No"
+      if (gradedFields.some(f => {
+        const fLower = f.toLowerCase()
+        return fieldNameLower === fLower || fieldNameLower.includes(fLower) || fLower.includes(fieldNameLower)
+      })) {
+        return false
+      }
+    } else {
+      // Hide condition field when graded is "Yes"
+      if (conditionFields.some(f => {
+        const fLower = f.toLowerCase()
+        return fieldNameLower === fLower || fieldNameLower.includes(fLower) || fLower.includes(fieldNameLower)
+      })) {
+        return false
+      }
+    }
+    
+    // Check autographed-related visibility
+    if (autographedIsNo) {
+      // Hide autograph fields when autographed is "No"
+      if (autographFields.some(f => {
+        const fLower = f.toLowerCase()
+        return fieldNameLower === fLower || fieldNameLower.includes(fLower) || fLower.includes(fieldNameLower)
+      })) {
+        return false
+      }
+    }
+    
+    return true
   }
 
   // Render a single aspect field based on its configuration
@@ -942,8 +1170,6 @@ export default function EditInventory() {
           </Button>
         </Box>
 
-        <Divider sx={{ my: { xs: 3, sm: 4 } }} />
-
         {/* AI Actions */}
         <Box sx={{ mb: { xs: 3, sm: 4 } }}>
           <Typography 
@@ -986,265 +1212,23 @@ export default function EditInventory() {
             >
               Assess Condition with AI
             </Button>
+            <Button
+              variant="outlined"
+              color="secondary"
+              startIcon={<DescriptionIcon />}
+              onClick={() => showSnackbar('This feature is not currently enabled', 'info')}
+              sx={{
+                fontSize: { xs: '0.9rem', sm: '1rem' },
+                py: { xs: 1, sm: 1.5 },
+                textTransform: 'none'
+              }}
+            >
+              Draft Item Description with AI
+            </Button>
           </Stack>
         </Box>
 
-        <Divider sx={{ my: { xs: 3, sm: 4 } }} />
-
-        {/* Form Fields */}
-        <Typography 
-          variant="h6" 
-          gutterBottom
-          sx={{
-            fontSize: { xs: '1.1rem', sm: '1.25rem' },
-            mb: 2
-          }}
-        >
-          Item Details
-        </Typography>
-        
-        <Grid container spacing={{ xs: 2, sm: 2.5, md: 3 }}>
-          <Grid item xs={12}>
-            <TextField
-              label="Title"
-              fullWidth
-              value={formData.title}
-              onChange={(e) => handleFormChange('title', e.target.value)}
-              inputProps={{ maxLength: 80 }}
-              helperText={`${formData.title.length}/80 characters`}
-              size="medium"
-              sx={{
-                '& .MuiInputBase-root': {
-                  fontSize: { xs: '0.9rem', sm: '1rem' }
-                }
-              }}
-            />
-          </Grid>
-
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth size="medium">
-              <InputLabel>Game</InputLabel>
-              <Select
-                value={formData.game}
-                label="Game"
-                onChange={(e) => handleFormChange('game', e.target.value)}
-                sx={{
-                  fontSize: { xs: '0.9rem', sm: '1rem' }
-                }}
-              >
-                <MenuItem value="Pokémon TCG">Pokémon TCG</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={12} sm={6}>
-            <FormControl component="fieldset">
-              <FormLabel 
-                component="legend"
-                sx={{
-                  fontSize: { xs: '0.9rem', sm: '1rem' }
-                }}
-              >
-                Graded
-              </FormLabel>
-              <RadioGroup
-                row
-                value={formData.graded}
-                onChange={(e) => handleFormChange('graded', e.target.value)}
-              >
-                <FormControlLabel value="Yes" control={<Radio />} label="Yes" />
-                <FormControlLabel value="No" control={<Radio />} label="No" />
-              </RadioGroup>
-            </FormControl>
-          </Grid>
-
-          {formData.graded === 'Yes' && (
-            <>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Professional Grader"
-                  fullWidth
-                  value={formData.professional_grader}
-                  onChange={(e) => handleFormChange('professional_grader', e.target.value)}
-                  size="medium"
-                  sx={{
-                    '& .MuiInputBase-root': {
-                      fontSize: { xs: '0.9rem', sm: '1rem' }
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth size="medium">
-                  <InputLabel>Grade</InputLabel>
-                  <Select
-                    value={formData.grade}
-                    label="Grade"
-                    onChange={(e) => handleFormChange('grade', e.target.value)}
-                    sx={{
-                      fontSize: { xs: '0.9rem', sm: '1rem' }
-                    }}
-                  >
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(grade => (
-                      <MenuItem key={grade} value={grade.toString()}>{grade}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-            </>
-          )}
-
-          {formData.graded === 'No' && (
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth size="medium">
-                <InputLabel>Condition</InputLabel>
-                <Select
-                  value={formData.condition}
-                  label="Condition"
-                  onChange={(e) => handleFormChange('condition', e.target.value)}
-                  sx={{
-                    fontSize: { xs: '0.9rem', sm: '1rem' }
-                  }}
-                >
-                  <MenuItem value="Near Mint">Near Mint</MenuItem>
-                  <MenuItem value="Lightly Played">Lightly Played</MenuItem>
-                  <MenuItem value="Moderately Played">Moderately Played</MenuItem>
-                  <MenuItem value="Heavily Played">Heavily Played</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-          )}
-
-          <Grid item xs={12} sm={6}>
-            <TextField
-              label="Card Name"
-              fullWidth
-              value={formData.card_name}
-              onChange={(e) => handleFormChange('card_name', e.target.value)}
-              size="medium"
-              sx={{
-                '& .MuiInputBase-root': {
-                  fontSize: { xs: '0.9rem', sm: '1rem' }
-                }
-              }}
-            />
-          </Grid>
-
-          <Grid item xs={12} sm={6}>
-            <TextField
-              label="Character"
-              fullWidth
-              value={formData.character}
-              onChange={(e) => handleFormChange('character', e.target.value)}
-              size="medium"
-              sx={{
-                '& .MuiInputBase-root': {
-                  fontSize: { xs: '0.9rem', sm: '1rem' }
-                }
-              }}
-            />
-          </Grid>
-
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth size="medium">
-              <InputLabel>Card Type</InputLabel>
-              <Select
-                value={formData.card_type}
-                label="Card Type"
-                onChange={(e) => handleFormChange('card_type', e.target.value)}
-                sx={{
-                  fontSize: { xs: '0.9rem', sm: '1rem' }
-                }}
-              >
-                <MenuItem value="Pokémon">Pokémon</MenuItem>
-                <MenuItem value="Trainer">Trainer</MenuItem>
-                <MenuItem value="Item">Item</MenuItem>
-                <MenuItem value="Stadium">Stadium</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-
-          {formData.card_type === 'Pokémon' && (
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth size="medium">
-                <InputLabel>Stage</InputLabel>
-                <Select
-                  value={formData.stage}
-                  label="Stage"
-                  onChange={(e) => handleFormChange('stage', e.target.value)}
-                  sx={{
-                    fontSize: { xs: '0.9rem', sm: '1rem' }
-                  }}
-                >
-                  <MenuItem value="Basic">Basic</MenuItem>
-                  <MenuItem value="Stage 1">Stage 1</MenuItem>
-                  <MenuItem value="Stage 2">Stage 2</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-          )}
-
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth size="medium">
-              <InputLabel>Language</InputLabel>
-              <Select
-                value={formData.language}
-                label="Language"
-                onChange={(e) => handleFormChange('language', e.target.value)}
-                sx={{
-                  fontSize: { xs: '0.9rem', sm: '1rem' }
-                }}
-              >
-                <MenuItem value="English">English</MenuItem>
-                <MenuItem value="Japanese">Japanese</MenuItem>
-                <MenuItem value="Chinese">Chinese</MenuItem>
-                <MenuItem value="Korean">Korean</MenuItem>
-                <MenuItem value="German">German</MenuItem>
-                <MenuItem value="Italian">Italian</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth size="medium">
-              <InputLabel>Finish</InputLabel>
-              <Select
-                value={formData.finish}
-                label="Finish"
-                onChange={(e) => handleFormChange('finish', e.target.value)}
-                sx={{
-                  fontSize: { xs: '0.9rem', sm: '1rem' }
-                }}
-              >
-                <MenuItem value="Regular">Regular</MenuItem>
-                <MenuItem value="Holo">Holo</MenuItem>
-                <MenuItem value="Reverse Holo">Reverse Holo</MenuItem>
-                <MenuItem value="Foil">Foil</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={12}>
-            <TextField
-              label="Description"
-              fullWidth
-              multiline
-              rows={4}
-              value={formData.description}
-              onChange={(e) => handleFormChange('description', e.target.value)}
-              size="medium"
-              sx={{
-                '& .MuiInputBase-root': {
-                  fontSize: { xs: '0.9rem', sm: '1rem' }
-                }
-              }}
-            />
-          </Grid>
-        </Grid>
-
-        {/* eBay Aspects Section */}
-        <Divider sx={{ my: { xs: 3, sm: 4 } }} />
-        
+        {/* Item Details Section */}
         <Box sx={{ mb: { xs: 3, sm: 4 } }}>
           <Typography 
             variant="h6" 
@@ -1254,50 +1238,105 @@ export default function EditInventory() {
               mb: 2
             }}
           >
-            eBay Product Aspects
+            Item Details
           </Typography>
           
+          {/* Basic Info - Title and Description */}
+          <Accordion 
+            expanded={isSectionExpanded('basicInfo')} 
+            onChange={handleAccordionChange('basicInfo')}
+            sx={{ mb: 2 }}
+          >
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography 
+                variant="subtitle1" 
+                sx={{ 
+                  fontWeight: 600,
+                  fontSize: { xs: '0.95rem', sm: '1rem' }
+                }}
+              >
+                Title and Description
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Grid container spacing={{ xs: 2, sm: 2.5, md: 3 }}>
+                <Grid item xs={12}>
+                  <TextField
+                    label="Title"
+                    fullWidth
+                    value={formData.title}
+                    onChange={(e) => handleFormChange('title', e.target.value)}
+                    inputProps={{ maxLength: 80 }}
+                    helperText={`${formData.title.length}/80 characters`}
+                    size="medium"
+                    sx={{
+                      '& .MuiInputBase-root': {
+                        fontSize: { xs: '0.9rem', sm: '1rem' }
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    label="Description"
+                    fullWidth
+                    multiline
+                    rows={4}
+                    value={formData.description}
+                    onChange={(e) => handleFormChange('description', e.target.value)}
+                    size="medium"
+                    sx={{
+                      '& .MuiInputBase-root': {
+                        fontSize: { xs: '0.9rem', sm: '1rem' }
+                      }
+                    }}
+                  />
+                </Grid>
+              </Grid>
+            </AccordionDetails>
+          </Accordion>
+              
+          {/* Aspect Fields */}
           {aspectsLoading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
               <CircularProgress size={32} />
             </Box>
           ) : aspectsError ? (
             <Alert severity="warning" sx={{ mb: 2 }}>
-              Failed to load eBay aspects: {aspectsError}
+              Failed to load item details: {aspectsError}
             </Alert>
           ) : aspects && aspectFields.length > 0 ? (
             <>
-              <Typography 
-                variant="body2" 
-                color="text.secondary"
-                sx={{ mb: 3, fontSize: { xs: '0.85rem', sm: '0.875rem' } }}
-              >
-                These fields are specific to eBay listings and help improve discoverability. 
-                Fields marked with * are required by eBay.
-              </Typography>
-              
               {Object.keys(groupedAspectFields).map(groupName => (
-                <Box key={groupName} sx={{ mb: 3 }}>
-                  <Typography 
-                    variant="subtitle1" 
-                    sx={{ 
-                      mb: 2, 
-                      fontWeight: 600,
-                      fontSize: { xs: '0.95rem', sm: '1rem' }
-                    }}
-                  >
-                    {groupName}
-                  </Typography>
-                  <Grid container spacing={{ xs: 2, sm: 2.5, md: 3 }}>
-                    {groupedAspectFields[groupName]
-                      .filter(field => !field.ui.hidden)
-                      .map(field => (
-                        <Grid item xs={12} sm={6} key={field.aspectName}>
-                          {renderAspectField(field)}
-                        </Grid>
-                      ))}
-                  </Grid>
-                </Box>
+                <Accordion 
+                  key={groupName}
+                  expanded={isSectionExpanded(groupName)} 
+                  onChange={handleAccordionChange(groupName)}
+                  sx={{ mb: 2 }}
+                >
+                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Typography 
+                      variant="subtitle1" 
+                      sx={{ 
+                        fontWeight: 600,
+                        fontSize: { xs: '0.95rem', sm: '1rem' }
+                      }}
+                    >
+                      {groupName}
+                    </Typography>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <Grid container spacing={{ xs: 2, sm: 2.5, md: 3 }}>
+                      {groupedAspectFields[groupName]
+                        .filter(field => !field.ui.hidden && isFieldVisible(field.aspectName))
+                        .map(field => (
+                          <Grid item xs={12} sm={6} key={field.aspectName}>
+                            {renderAspectField(field)}
+                          </Grid>
+                        ))}
+                    </Grid>
+                  </AccordionDetails>
+                </Accordion>
               ))}
             </>
           ) : null}
