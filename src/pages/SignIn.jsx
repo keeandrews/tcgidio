@@ -12,39 +12,6 @@ import { Link as RouterLink } from 'react-router-dom'
 import Snackbar from '@mui/material/Snackbar'
 import Alert from '@mui/material/Alert'
 
-// IndexedDB helper functions
-const DB_NAME = 'InventoryDB'
-const DB_VERSION = 1
-const STORE_NAME = 'inventory'
-
-const openDB = () => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION)
-    
-    request.onerror = () => reject(request.error)
-    request.onsuccess = () => resolve(request.result)
-    
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME)
-      }
-    }
-  })
-}
-
-const saveToIndexedDB = async (key, value) => {
-  const db = await openDB()
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORE_NAME], 'readwrite')
-    const store = transaction.objectStore(STORE_NAME)
-    const request = store.put(value, key)
-    
-    request.onsuccess = () => resolve()
-    request.onerror = () => reject(request.error)
-  })
-}
-
 export default function SignIn() {
   const [formData, setFormData] = useState({
     email: '',
@@ -99,55 +66,6 @@ export default function SignIn() {
     }
   }
 
-  const fetchInventory = async (token) => {
-    try {
-      const response = await fetch('https://tcgid.io/api/inventory/ebay', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success && data.data?.url && data.data?.job_id) {
-          // Check if we already have this inventory cached
-          const cachedJobId = localStorage.getItem('inventory_job_id')
-          if (cachedJobId === data.data.job_id) {
-            // Already have this inventory, no need to re-download
-            return
-          }
-
-          // Download the inventory JSON from presigned URL
-          try {
-            const inventoryResponse = await fetch(data.data.url, {
-              mode: 'cors',
-              credentials: 'omit',
-            })
-            if (inventoryResponse.ok) {
-              const inventoryData = await inventoryResponse.json()
-              // Save to IndexedDB (can handle large datasets)
-              try {
-                await saveToIndexedDB(`${data.data.job_id}.json`, inventoryData)
-                localStorage.setItem('inventory_job_id', data.data.job_id)
-                localStorage.setItem('inventory_updated_at', data.data.updated_at)
-              } catch (saveError) {
-                console.error('Error saving to IndexedDB:', saveError)
-              }
-            }
-          } catch (corsError) {
-            // CORS error - likely S3 bucket not configured for localhost
-            // This is expected in development, will work in production
-            // Silently ignore as this is a background operation
-          }
-        }
-      }
-    } catch (error) {
-      // Silently fail - this is a background operation
-      // User can manually sync from inventory page if needed
-    }
-  }
-
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
@@ -176,9 +94,6 @@ export default function SignIn() {
 
           // Dispatch event to update Navigation component
           window.dispatchEvent(new Event('authStateChange'))
-
-          // Fetch inventory in the background
-          fetchInventory(responseData.data.token)
 
           // Check email_verified status
           if (claims.email_verified === false) {
