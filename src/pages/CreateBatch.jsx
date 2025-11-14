@@ -11,6 +11,10 @@ import InputLabel from '@mui/material/InputLabel'
 import Stack from '@mui/material/Stack'
 import Alert from '@mui/material/Alert'
 import Snackbar from '@mui/material/Snackbar'
+import Dialog from '@mui/material/Dialog'
+import DialogContent from '@mui/material/DialogContent'
+import CircularProgress from '@mui/material/CircularProgress'
+import LinearProgress from '@mui/material/LinearProgress'
 import CloudUploadIcon from '@mui/icons-material/CloudUpload'
 import DeleteIcon from '@mui/icons-material/Delete'
 import { styled } from '@mui/material/styles'
@@ -56,6 +60,9 @@ export default function CreateBatch() {
   const [snackbarMessage, setSnackbarMessage] = useState('')
   const [snackbarSeverity, setSnackbarSeverity] = useState('success')
   const [isUploading, setIsUploading] = useState(false)
+  const [progressModalOpen, setProgressModalOpen] = useState(false)
+  const [progressMessage, setProgressMessage] = useState('')
+  const [uploadProgress, setUploadProgress] = useState(0)
 
   // Check authentication
   useEffect(() => {
@@ -131,12 +138,17 @@ export default function CreateBatch() {
     }
 
     setIsUploading(true)
+    setProgressModalOpen(true)
+    setProgressMessage('Preparing upload...')
+    setUploadProgress(0)
 
     try {
       // Step 1: Get presigned URL
       const filename = encodeURIComponent(selectedFile.name)
       const photos = photosPerListing
       const apiUrl = `https://tcgid.io/api/v2/inventory/job?filename=${filename}&photos=${photos}`
+      
+      setProgressMessage('Requesting upload URL...')
       
       const response = await fetch(apiUrl, {
         method: 'GET',
@@ -150,25 +162,93 @@ export default function CreateBatch() {
         
         if (data.success && data.data && data.data.upload_url) {
           // Step 2: Upload file to presigned URL
-          const uploadResponse = await fetch(data.data.upload_url, {
-            method: 'PUT',
-            body: selectedFile,
-            headers: {
-              'Content-Type': 'application/zip'
-            }
+          // Use content_type from response if available, otherwise default to application/zip
+          const contentType = data.data.content_type || 'application/zip'
+          
+          console.log('Starting file upload:', {
+            filename: selectedFile.name,
+            size: selectedFile.size,
+            contentType,
+            uploadUrl: data.data.upload_url.substring(0, 100) + '...' // Log partial URL for debugging
           })
+          
+          setProgressMessage(`Uploading ${selectedFile.name}...`)
+          setUploadProgress(10) // Show some initial progress
+          
+          // Create XMLHttpRequest for upload progress tracking
+          const xhr = new XMLHttpRequest()
+          
+          try {
+            // Use XMLHttpRequest for progress tracking
+            await new Promise((resolve, reject) => {
+              xhr.upload.addEventListener('progress', (event) => {
+                if (event.lengthComputable) {
+                  const percentComplete = Math.round((event.loaded / event.total) * 90) + 10 // 10-100%
+                  setUploadProgress(percentComplete)
+                }
+              })
+              
+              xhr.addEventListener('load', () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                  resolve(xhr)
+                } else {
+                  reject(new Error(`Upload failed with status ${xhr.status}`))
+                }
+              })
+              
+              xhr.addEventListener('error', () => {
+                reject(new Error('Upload failed'))
+              })
+              
+              xhr.addEventListener('abort', () => {
+                reject(new Error('Upload aborted'))
+              })
+              
+              xhr.open('PUT', data.data.upload_url)
+              xhr.setRequestHeader('Content-Type', contentType)
+              
+              // Set timeout
+              xhr.timeout = 300000 // 5 minutes
+              xhr.ontimeout = () => {
+                reject(new Error('Upload timeout'))
+              }
+              
+              xhr.send(selectedFile)
+            })
 
-          if (uploadResponse.ok) {
+            setUploadProgress(100)
+            setProgressMessage('Upload complete! Processing batch...')
+
+            // Small delay to show completion
+            await new Promise(resolve => setTimeout(resolve, 500))
+
+            setProgressModalOpen(false)
             showSnackbar('Batch created successfully!', 'success')
             // Reset form after successful upload
             handleReset()
-          } else {
-            showSnackbar('Failed to upload file. Please try again.', 'error')
+            
+            // Redirect to inventory page after a short delay to show success message
+            setTimeout(() => {
+              navigate('/inventory')
+            }, 1500)
+          } catch (uploadError) {
+            if (uploadError.message === 'Upload timeout') {
+              console.error('Upload timeout after 5 minutes')
+              setProgressModalOpen(false)
+              showSnackbar('Upload timed out. The file may be too large. Please try again.', 'error')
+            } else {
+              console.error('Upload error:', uploadError)
+              setProgressModalOpen(false)
+              showSnackbar('Failed to upload file. Please check your connection and try again.', 'error')
+            }
+            // Don't rethrow - we've already handled the error
           }
         } else {
+          setProgressModalOpen(false)
           showSnackbar('Invalid response from server. Please try again.', 'error')
         }
       } else {
+        setProgressModalOpen(false)
         const errorData = await response.json().catch(() => ({}))
         showSnackbar(
           errorData.message || `Failed to create batch. Status: ${response.status}`,
@@ -176,6 +256,7 @@ export default function CreateBatch() {
         )
       }
     } catch (error) {
+      setProgressModalOpen(false)
       console.error('Error creating batch:', error)
       showSnackbar('An error occurred. Please try again.', 'error')
     } finally {
@@ -387,6 +468,79 @@ export default function CreateBatch() {
           {snackbarMessage}
         </Alert>
       </Snackbar>
+
+      {/* Progress Modal */}
+      <Dialog
+        open={progressModalOpen}
+        aria-labelledby="progress-dialog-title"
+        aria-describedby="progress-dialog-description"
+        disableEscapeKeyDown
+        onClose={(event, reason) => {
+          // Prevent closing during processing
+          if (reason === 'backdropClick' || reason === 'escapeKeyDown') {
+            return
+          }
+        }}
+        PaperProps={{
+          sx: {
+            minWidth: { xs: '280px', sm: '400px' },
+            borderRadius: 2,
+          }
+        }}
+      >
+        <DialogContent>
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              py: 3,
+            }}
+          >
+            <CircularProgress size={48} sx={{ mb: 3 }} />
+            <Typography
+              id="progress-dialog-title"
+              variant="h6"
+              component="div"
+              sx={{
+                textAlign: 'center',
+                mb: 2,
+                fontWeight: 500,
+              }}
+            >
+              {progressMessage}
+            </Typography>
+            {progressMessage.includes('Uploading') && (
+              <>
+                <Box sx={{ width: '100%', mb: 2 }}>
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={uploadProgress} 
+                    sx={{ height: 8, borderRadius: 4 }}
+                  />
+                </Box>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ textAlign: 'center' }}
+                >
+                  {uploadProgress}% complete
+                </Typography>
+              </>
+            )}
+            {!progressMessage.includes('Uploading') && (
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ textAlign: 'center' }}
+              >
+                Please wait...
+              </Typography>
+            )}
+          </Box>
+        </DialogContent>
+      </Dialog>
     </Box>
   )
 }
