@@ -20,10 +20,11 @@ const aspectLayoutConfig = {
   'Year Manufactured': { group: 'Details', order: 6 },
   'Autographed': { group: 'Advanced', order: 1 },
   'Autograph Authentication': { group: 'Advanced', order: 2 },
-  'Autograph Format': { group: 'Advanced', order: 3 },
-  'Manufacturer': { group: 'Advanced', order: 4 },
-  'Material': { group: 'Advanced', order: 5 },
-  'Vintage': { group: 'Advanced', order: 6 },
+  'Autograph Authentication Number': { group: 'Advanced', order: 3 },
+  'Autograph Format': { group: 'Advanced', order: 4 },
+  'Manufacturer': { group: 'Advanced', order: 5 },
+  'Material': { group: 'Advanced', order: 6 },
+  'Vintage': { group: 'Advanced', order: 7 },
 }
 
 /**

@@ -51,10 +51,11 @@ const getThumbnailUrl = (imageUrl, size = '300') => {
 // Memoized table row component for performance
 const InventoryRow = React.memo(({ row, isItemSelected, handleClick, handleEdit }) => {
   const thumbnailUrl = getThumbnailUrl(row.images?.[0], '300')
-  const title = row.inventory_data?.title || 'No title'
+  const title = row.inventory_data?.title || '-'
+  const game = row.inventory_data?.game || '-'
   
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A'
+    if (!dateString) return '-'
     try {
       const date = new Date(dateString)
       return date.toLocaleDateString('en-US', { 
@@ -65,7 +66,7 @@ const InventoryRow = React.memo(({ row, isItemSelected, handleClick, handleEdit 
         minute: '2-digit'
       })
     } catch (error) {
-      return 'Invalid date'
+      return '-'
     }
   }
 
@@ -120,6 +121,17 @@ const InventoryRow = React.memo(({ row, isItemSelected, handleClick, handleEdit 
             e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60"><rect fill="%23ddd" width="60" height="60"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%23999" font-size="10">No Image</text></svg>'
           }}
         />
+      </TableCell>
+      <TableCell onClick={() => handleClick(row.id)}>
+        <Typography 
+          variant="body2" 
+          noWrap 
+          sx={{ 
+            fontSize: { xs: '0.8rem', sm: '0.875rem' }
+          }}
+        >
+          {game}
+        </Typography>
       </TableCell>
       <TableCell onClick={() => handleClick(row.id)}>
         <Typography 
@@ -239,6 +251,9 @@ export default function Inventory() {
       if (orderBy === 'title') {
         aValue = a.inventory_data?.title || ''
         bValue = b.inventory_data?.title || ''
+      } else if (orderBy === 'game') {
+        aValue = a.inventory_data?.game || ''
+        bValue = b.inventory_data?.game || ''
       } else if (orderBy === 'created_at' || orderBy === 'updated_at') {
         aValue = new Date(a[orderBy]).getTime()
         bValue = new Date(b[orderBy]).getTime()
@@ -444,6 +459,7 @@ export default function Inventory() {
     { id: 'checkbox', label: '', sortable: false, width: 48 },
     { id: 'edit', label: '', sortable: false, width: 48 },
     { id: 'image', label: 'Image', sortable: false, width: 80 },
+    { id: 'game', label: 'Game', sortable: true, width: 150 },
     { id: 'title', label: 'Title', sortable: true, width: 250 },
     { id: 'created_at', label: 'Created', sortable: true, width: 150, hideOnMobile: true },
     { id: 'updated_at', label: 'Updated', sortable: true, width: 150 },
