@@ -61,7 +61,10 @@ export default function useEbayAspects(categoryId) {
       setError(null)
 
       try {
-        const response = await fetch(`https://cdn.tcgid.io/aspects/${categoryId}.json`)
+        // Temporary cache buster - remove after CloudFront invalidation completes
+        // CloudFront is correctly configured but has old cached responses
+        const cacheBuster = `?v=${Date.now()}`
+        const response = await fetch(`https://cdn.tcgid.io/aspects/${categoryId}.json${cacheBuster}`)
         
         if (!response.ok) {
           throw new Error(`Failed to fetch aspects: ${response.statusText}`)
