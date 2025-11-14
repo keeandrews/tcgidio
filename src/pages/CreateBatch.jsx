@@ -4,12 +4,7 @@ import Box from '@mui/material/Box'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
 import Button from '@mui/material/Button'
-import TextField from '@mui/material/TextField'
 import FormControl from '@mui/material/FormControl'
-import FormLabel from '@mui/material/FormLabel'
-import RadioGroup from '@mui/material/RadioGroup'
-import FormControlLabel from '@mui/material/FormControlLabel'
-import Radio from '@mui/material/Radio'
 import Select from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
 import InputLabel from '@mui/material/InputLabel'
@@ -32,7 +27,9 @@ const VisuallyHiddenInput = styled('input')({
   width: 1,
 })
 
-const UploadArea = styled(Box)(({ theme, isDragOver }) => ({
+const UploadArea = styled(Box, {
+  shouldForwardProp: (prop) => prop !== 'isDragOver',
+})(({ theme, isDragOver }) => ({
   border: `2px dashed ${isDragOver ? theme.palette.primary.main : theme.palette.divider}`,
   borderRadius: theme.shape.borderRadius,
   padding: theme.spacing(4),
@@ -53,13 +50,12 @@ export default function CreateBatch() {
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
   const [selectedFile, setSelectedFile] = useState(null)
-  const [batchName, setBatchName] = useState('')
   const [photosPerListing, setPhotosPerListing] = useState('1')
-  const [groupBy, setGroupBy] = useState('filename')
   const [isDragOver, setIsDragOver] = useState(false)
   const [snackbarOpen, setSnackbarOpen] = useState(false)
   const [snackbarMessage, setSnackbarMessage] = useState('')
   const [snackbarSeverity, setSnackbarSeverity] = useState('success')
+  const [isUploading, setIsUploading] = useState(false)
 
   // Check authentication
   useEffect(() => {
@@ -127,19 +123,69 @@ export default function CreateBatch() {
       return
     }
 
-    // TODO: When endpoints are ready, implement:
-    // 1. Call endpoint to get batch name and presigned URL
-    // 2. Upload zip file to presigned URL
-    // 3. Handle response
+    const token = localStorage.getItem('token')
+    if (!token) {
+      showSnackbar('Please sign in to continue', 'error')
+      navigate('/signin')
+      return
+    }
 
-    showSnackbar('Batch creation functionality will be available soon', 'info')
+    setIsUploading(true)
+
+    try {
+      // Step 1: Get presigned URL
+      const filename = encodeURIComponent(selectedFile.name)
+      const photos = photosPerListing
+      const apiUrl = `https://tcgid.io/api/v2/inventory/job?filename=${filename}&photos=${photos}`
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (response.ok && (response.status === 200 || response.status === 201)) {
+        const data = await response.json()
+        
+        if (data.success && data.data && data.data.upload_url) {
+          // Step 2: Upload file to presigned URL
+          const uploadResponse = await fetch(data.data.upload_url, {
+            method: 'PUT',
+            body: selectedFile,
+            headers: {
+              'Content-Type': 'application/zip'
+            }
+          })
+
+          if (uploadResponse.ok) {
+            showSnackbar('Batch created successfully!', 'success')
+            // Reset form after successful upload
+            handleReset()
+          } else {
+            showSnackbar('Failed to upload file. Please try again.', 'error')
+          }
+        } else {
+          showSnackbar('Invalid response from server. Please try again.', 'error')
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        showSnackbar(
+          errorData.message || `Failed to create batch. Status: ${response.status}`,
+          'error'
+        )
+      }
+    } catch (error) {
+      console.error('Error creating batch:', error)
+      showSnackbar('An error occurred. Please try again.', 'error')
+    } finally {
+      setIsUploading(false)
+    }
   }
 
   const handleReset = () => {
     setSelectedFile(null)
-    setBatchName('')
     setPhotosPerListing('1')
-    setGroupBy('filename')
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -191,9 +237,7 @@ export default function CreateBatch() {
             <strong>How to create a batch:</strong>
             <Box component="ol" sx={{ mt: 1, mb: 0, pl: 2 }}>
               <li>Upload a .zip file containing all photos for your listings</li>
-              <li>Enter a unique name for this batch (optional)</li>
               <li>Select how many photos should be grouped per listing</li>
-              <li>Choose how photos should be grouped (by filename or creation date)</li>
               <li>Click "Create Batch" to process your upload</li>
             </Box>
             <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic' }}>
@@ -273,16 +317,6 @@ export default function CreateBatch() {
             )}
           </Box>
 
-          {/* Batch Name Field */}
-          <TextField
-            label="Batch Name (Optional)"
-            value={batchName}
-            onChange={(e) => setBatchName(e.target.value)}
-            placeholder="Enter a name for this batch (optional)"
-            fullWidth
-            helperText="Choose a descriptive name to identify this batch later (optional)"
-          />
-
           {/* Photos Per Listing Dropdown */}
           <FormControl fullWidth>
             <InputLabel>Photos Per Listing</InputLabel>
@@ -308,36 +342,6 @@ export default function CreateBatch() {
             </Typography>
           </FormControl>
 
-          {/* Group By Radio Selector */}
-          <FormControl component="fieldset">
-            <FormLabel component="legend">Group Photos By</FormLabel>
-            <RadioGroup
-              value={groupBy}
-              onChange={(e) => setGroupBy(e.target.value)}
-              row
-              sx={{ 
-                flexDirection: { xs: 'column', sm: 'row' },
-                gap: { xs: 0, sm: 2 }
-              }}
-            >
-              <FormControlLabel 
-                value="filename" 
-                control={<Radio />} 
-                label="Filename" 
-              />
-              <FormControlLabel 
-                value="creation_date" 
-                control={<Radio />} 
-                label="Creation Date" 
-              />
-            </RadioGroup>
-            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-              Choose how photos should be grouped when creating listings. 
-              Filename grouping uses the file names to determine groups, 
-              while creation date grouping uses the file creation timestamps.
-            </Typography>
-          </FormControl>
-
           {/* Action Buttons */}
           <Stack 
             direction={{ xs: 'column', sm: 'row' }} 
@@ -350,8 +354,10 @@ export default function CreateBatch() {
             <Button
               variant="outlined"
               onClick={handleReset}
-              fullWidth={{ xs: true, sm: false }}
-              sx={{ minWidth: { sm: '120px' } }}
+              sx={{ 
+                minWidth: { sm: '120px' },
+                width: { xs: '100%', sm: 'auto' }
+              }}
             >
               Reset
             </Button>
@@ -359,11 +365,13 @@ export default function CreateBatch() {
               variant="contained"
               color="primary"
               onClick={handleSubmit}
-              fullWidth={{ xs: true, sm: false }}
-              sx={{ minWidth: { sm: '150px' } }}
-              disabled={!selectedFile}
+              sx={{ 
+                minWidth: { sm: '150px' },
+                width: { xs: '100%', sm: 'auto' }
+              }}
+              disabled={!selectedFile || isUploading}
             >
-              Create Batch
+              {isUploading ? 'Uploading...' : 'Create Batch'}
             </Button>
           </Stack>
         </Stack>
