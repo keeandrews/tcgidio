@@ -4,22 +4,19 @@ import Box from '@mui/material/Box'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
 import Button from '@mui/material/Button'
-import TextField from '@mui/material/TextField'
 import FormControl from '@mui/material/FormControl'
-import FormLabel from '@mui/material/FormLabel'
-import RadioGroup from '@mui/material/RadioGroup'
-import FormControlLabel from '@mui/material/FormControlLabel'
-import Radio from '@mui/material/Radio'
 import Select from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
 import InputLabel from '@mui/material/InputLabel'
 import Stack from '@mui/material/Stack'
 import Alert from '@mui/material/Alert'
 import Snackbar from '@mui/material/Snackbar'
+import Dialog from '@mui/material/Dialog'
+import DialogContent from '@mui/material/DialogContent'
+import CircularProgress from '@mui/material/CircularProgress'
 import CloudUploadIcon from '@mui/icons-material/CloudUpload'
 import DeleteIcon from '@mui/icons-material/Delete'
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator'
-import ImageIcon from '@mui/icons-material/Image'
 import { styled } from '@mui/material/styles'
 import IconButton from '@mui/material/IconButton'
 import Grid from '@mui/material/Grid'
@@ -78,15 +75,18 @@ export default function CreateInventory() {
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
   const [selectedFiles, setSelectedFiles] = useState([])
-  const [batchName, setBatchName] = useState('')
   const [photosPerListing, setPhotosPerListing] = useState('1')
-  const [groupBy, setGroupBy] = useState('order_selected')
   const [isDragOver, setIsDragOver] = useState(false)
   const [draggedIndex, setDraggedIndex] = useState(null)
   const [dragOverIndex, setDragOverIndex] = useState(null)
   const [snackbarOpen, setSnackbarOpen] = useState(false)
   const [snackbarMessage, setSnackbarMessage] = useState('')
   const [snackbarSeverity, setSnackbarSeverity] = useState('success')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [progressModalOpen, setProgressModalOpen] = useState(false)
+  const [progressMessage, setProgressMessage] = useState('')
+  const [uploadedCount, setUploadedCount] = useState(0)
+  const [totalImages, setTotalImages] = useState(0)
 
   // Check authentication
   useEffect(() => {
@@ -226,12 +226,476 @@ export default function CreateInventory() {
       return
     }
 
-    // TODO: When endpoints are ready, implement:
-    // 1. Call endpoint to get batch name and presigned URL
-    // 2. Upload image files to presigned URL
-    // 3. Handle response
+    // Validate that the number of photos is evenly divisible by photos per listing
+    const photosPerListingNum = parseInt(photosPerListing, 10)
+    if (selectedFiles.length % photosPerListingNum !== 0) {
+      showSnackbar(
+        `The number of photos (${selectedFiles.length}) must be evenly divisible by the photos per listing (${photosPerListingNum}). Please adjust your selection.`,
+        'error'
+      )
+      return
+    }
 
-    showSnackbar('Inventory creation functionality will be available soon', 'info')
+    const token = localStorage.getItem('token')
+    if (!token) {
+      showSnackbar('Authentication required. Please sign in again.', 'error')
+      navigate('/signin')
+      return
+    }
+
+    setIsSubmitting(true)
+    
+    // Step 1: Group photos based on photos per listing
+    const groups = []
+    for (let i = 0; i < selectedFiles.length; i += photosPerListingNum) {
+      groups.push(selectedFiles.slice(i, i + photosPerListingNum))
+    }
+
+    // Initialize progress tracking
+    setTotalImages(selectedFiles.length)
+    setUploadedCount(0)
+    setProgressModalOpen(true)
+    setProgressMessage(`Creating ${groups.length} Inventory Item${groups.length !== 1 ? 's' : ''}...`)
+
+    try {
+      // Step 2: Prepare batch request body with filenames
+      const batchRequestBody = {}
+      groups.forEach((group, index) => {
+        const groupNumber = String(index + 1)
+        batchRequestBody[groupNumber] = group.map(fileObj => fileObj.file.name)
+      })
+
+      // Step 3: Call batch endpoint to create inventory items and get presigned URLs
+      const batchResponse = await fetch(
+        `https://tcgid.io/api/v2/inventory/batch?count=${groups.length}&photos=${photosPerListingNum}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(batchRequestBody),
+        }
+      )
+
+      const batchData = await batchResponse.json()
+
+      if (!batchResponse.ok || !batchData.success) {
+        setProgressModalOpen(false)
+        throw new Error(batchData.data || 'Failed to create batch inventory items')
+      }
+
+      const batchResults = batchData.data
+      
+      // Update progress message to show uploading
+      const totalImageCount = selectedFiles.length
+      setProgressMessage(`Uploading 0/${totalImageCount} images...`)
+
+      // Step 4: Upload all images concurrently across all groups
+      // Build a map of all upload tasks: filename -> { presignedUrl, file, groupIndex, inventoryId }
+      const uploadTasks = []
+      const filenameToUploadInfo = {} // Track filename -> upload info for ordering later
+      
+      groups.forEach((group, groupIndex) => {
+        const groupNumber = String(groupIndex + 1)
+        const groupData = batchResults[groupNumber]
+        
+        if (!groupData || !groupData.id) {
+          console.error(`Group ${groupNumber} missing from batch response`)
+          return
+        }
+        
+        const inventoryId = groupData.id
+        const imageUrls = groupData.image_urls || {}
+        
+        group.forEach((fileObj) => {
+          const filename = fileObj.file.name
+          const presignedUrl = imageUrls[filename]
+          
+          if (presignedUrl) {
+            // Extract upload_uuid from presigned URL
+            // Pattern: https://bucket.s3.amazonaws.com/{user_id}/{inventory_id}/{upload_uuid}/{filename}?...
+            // Example: https://user-uploads-tcgid-io.s3.amazonaws.com/7ecafeb2-.../44074fa4-.../d96b13b4-.../example1.jpg?...
+            const urlParts = presignedUrl.split('/')
+            const inventoryIndex = urlParts.findIndex(part => part === inventoryId)
+            let uploadUuid = null
+            
+            if (inventoryIndex >= 0 && inventoryIndex + 1 < urlParts.length) {
+              // The upload_uuid is the part right after inventory_id
+              uploadUuid = urlParts[inventoryIndex + 1].split('?')[0] // Remove query params if any
+            }
+            
+            // Fallback: try regex match for UUID pattern
+            if (!uploadUuid) {
+              const uuidMatch = presignedUrl.match(/\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\/[^\/]+\.(jpg|jpeg|png|gif|bmp|webp|svg)/i)
+              if (uuidMatch) {
+                // Find which UUID is the upload_uuid (should be after inventory_id)
+                const allUuids = presignedUrl.match(/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/gi)
+                if (allUuids && allUuids.length >= 3) {
+                  // user_id, inventory_id, upload_uuid
+                  uploadUuid = allUuids[2]
+                }
+              }
+            }
+            
+            const finalUploadUuid = uploadUuid
+            
+            uploadTasks.push({
+              filename,
+              presignedUrl,
+              file: fileObj.file,
+              groupIndex,
+              inventoryId,
+              uploadUuid: finalUploadUuid,
+            })
+            
+            filenameToUploadInfo[filename] = {
+              groupIndex,
+              inventoryId,
+              uploadUuid: finalUploadUuid,
+            }
+          }
+        })
+      })
+
+      // Upload all images concurrently
+      const uploadPromises = uploadTasks.map(async (task) => {
+        const contentType = task.file.type || 'image/jpeg'
+        
+        const uploadResponse = await fetch(task.presignedUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': contentType,
+          },
+          body: task.file,
+        })
+
+        if (!uploadResponse.ok) {
+          const errorText = await uploadResponse.text().catch(() => 'Unknown error')
+          throw new Error(`Failed to upload ${task.filename}: ${uploadResponse.status} ${errorText}`)
+        }
+
+        if (uploadResponse.status !== 200) {
+          throw new Error(`Unexpected S3 upload status for ${task.filename}: ${uploadResponse.status}`)
+        }
+
+        // Update progress counter
+        setUploadedCount(prev => {
+          const newCount = prev + 1
+          setProgressMessage(`Uploading ${newCount}/${totalImageCount} images...`)
+          return newCount
+        })
+
+        console.log(`Successfully uploaded image: ${task.filename}`)
+        return task
+      })
+
+      // Wait for all uploads to complete
+      const uploadResults = await Promise.allSettled(uploadPromises)
+      
+      // Check for upload failures
+      const failedUploads = uploadResults.filter(result => result.status === 'rejected')
+      if (failedUploads.length > 0) {
+        console.error('Some uploads failed:', failedUploads)
+        // Continue processing - we'll handle failures per group
+      }
+
+      // Step 5: Process all groups in parallel - poll and reorder images
+      const processGroup = async (group, groupIndex) => {
+        const groupNumber = String(groupIndex + 1)
+        const groupData = batchResults[groupNumber]
+        let inventoryId = null
+
+        if (!groupData || !groupData.id) {
+          console.error(`Group ${groupNumber} missing from batch response`)
+          return { success: false, groupIndex: groupIndex + 1 }
+        }
+
+        inventoryId = groupData.id
+
+        try {
+
+          // Step 6: Poll for processed images until images array is populated
+          const pollForProcessedImages = async () => {
+            const startTime = Date.now()
+            const timeout = 30000 // 30 seconds timeout
+            const pollInterval = 1500 // Poll every 1.5 seconds
+
+            const poll = async () => {
+              try {
+                const response = await fetch(
+                  `https://tcgid.io/api/v2/inventory/${inventoryId}`,
+                  {
+                    method: 'GET',
+                    headers: {
+                      'Authorization': `Bearer ${token}`,
+                    },
+                  }
+                )
+
+                const data = await response.json()
+
+                if (response.ok && data.success) {
+                  const currentImages = data.data.images || []
+                  
+                  // Check if we have the expected number of images
+                  if (currentImages.length !== group.length) {
+                    // Not all images processed yet, continue polling
+                    if (Date.now() - startTime > timeout) {
+                      console.warn(`Timeout: Only ${currentImages.length} of ${group.length} images processed (group ${groupNumber})`)
+                      return null
+                    }
+                    await new Promise(resolve => setTimeout(resolve, pollInterval))
+                    return poll()
+                  }
+
+                  // All images are present, return both images and full data (for user_id)
+                  return { images: currentImages, inventoryData: data.data }
+                }
+
+                // Check timeout
+                if (Date.now() - startTime > timeout) {
+                  console.warn(`Timeout waiting for processed images (group ${groupNumber})`)
+                  return null
+                }
+
+                // Continue polling
+                await new Promise(resolve => setTimeout(resolve, pollInterval))
+                return poll()
+              } catch (error) {
+                console.error(`Error polling for processed images (group ${groupNumber}):`, error)
+                if (Date.now() - startTime > timeout) {
+                  return null
+                }
+                await new Promise(resolve => setTimeout(resolve, pollInterval))
+                return poll()
+              }
+            }
+
+            return poll()
+          }
+
+          // Poll for processed images
+          const pollResult = await pollForProcessedImages()
+
+          if (!pollResult || !pollResult.images || pollResult.images.length !== group.length) {
+            throw new Error(`Failed to get all processed images: ${pollResult?.images?.length || 0} of ${group.length}`)
+          }
+
+          const processedImages = pollResult.images
+          const userId = pollResult.inventoryData?.user_id
+
+          // Step 7: Reorder images based on original file order
+
+          // Extract upload_uuid from each processed image URL and match to original order
+          const orderedImages = []
+          
+          for (const fileObj of group) {
+            const filename = fileObj.file.name
+            const uploadInfo = filenameToUploadInfo[filename]
+            
+            if (!uploadInfo || !uploadInfo.uploadUuid) {
+              console.warn(`Could not find upload info for ${filename}`)
+              // Try to construct URL if we have user_id
+              if (userId) {
+                const constructedUrl = `https://tcgid.io/images/${userId}/${inventoryId}/${uploadInfo?.uploadUuid || 'unknown'}/master.png`
+                orderedImages.push(constructedUrl)
+              }
+              continue
+            }
+
+            // Find the processed image URL that contains this upload_uuid
+            const matchingImage = processedImages.find(img => 
+              img && img.includes(`/${uploadInfo.uploadUuid}/`)
+            )
+
+            if (matchingImage) {
+              orderedImages.push(matchingImage)
+            } else {
+              // Fallback: construct the URL using the pattern
+              if (userId) {
+                const constructedUrl = `https://tcgid.io/images/${userId}/${inventoryId}/${uploadInfo.uploadUuid}/master.png`
+                orderedImages.push(constructedUrl)
+                console.log(`Constructed URL for ${filename}: ${constructedUrl}`)
+              } else {
+                console.warn(`Could not construct URL for ${filename}: missing user_id`)
+              }
+            }
+          }
+
+          // Verify we have all images in the correct order
+          if (orderedImages.length !== group.length) {
+            throw new Error(`Could not order all images: ${orderedImages.length} of ${group.length}`)
+          }
+
+          // Step 8: Update inventory with correctly ordered images
+          const updateResponse = await fetch(
+            `https://tcgid.io/api/v2/inventory/${inventoryId}`,
+            {
+              method: 'PATCH',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                images: orderedImages,
+              }),
+            }
+          )
+
+          const updateData = await updateResponse.json()
+
+          if (!updateResponse.ok || !updateData.success) {
+            throw new Error(updateData.data || 'Failed to update inventory with ordered images')
+          }
+
+          // Final verification: Get the inventory item one more time
+          const verifyResponse = await fetch(
+            `https://tcgid.io/api/v2/inventory/${inventoryId}`,
+            {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+              },
+            }
+          )
+
+          const verifyData = await verifyResponse.json()
+
+          if (verifyResponse.ok && verifyData.success) {
+            const finalImages = verifyData.data.images || []
+            
+            // Verify we have the expected number of images
+            if (finalImages.length !== group.length) {
+              console.error(`Final verification: Expected ${group.length} images but got ${finalImages.length} (group ${groupNumber})`)
+              // Deactivate if we don't have all images
+              if (inventoryId) {
+                try {
+                  await fetch(`https://tcgid.io/api/v2/inventory/${inventoryId}`, {
+                    method: 'DELETE',
+                    headers: {
+                      'Authorization': `Bearer ${token}`,
+                    },
+                  })
+                } catch (deleteError) {
+                  console.error('Error deactivating inventory item:', deleteError)
+                }
+              }
+              throw new Error(`Final verification failed: Only ${finalImages.length} of ${group.length} images are present`)
+            }
+
+            // Check for images that might be errors (empty or invalid URLs)
+            const validImages = finalImages.filter(img => 
+              img && img.trim() !== '' && !img.includes('error') && !img.includes('undefined')
+            )
+
+            if (validImages.length !== group.length) {
+              console.warn(`Warning: ${finalImages.length - validImages.length} images may be invalid (group ${groupNumber})`)
+              // If we have fewer valid images than expected, deactivate
+              if (validImages.length < group.length) {
+                if (inventoryId) {
+                  try {
+                    await fetch(`https://tcgid.io/api/v2/inventory/${inventoryId}`, {
+                      method: 'DELETE',
+                      headers: {
+                        'Authorization': `Bearer ${token}`,
+                      },
+                    })
+                  } catch (deleteError) {
+                    console.error('Error deactivating inventory item:', deleteError)
+                  }
+                }
+                throw new Error(`Invalid images detected: Only ${validImages.length} valid images out of ${group.length}`)
+              }
+            }
+          } else {
+            console.error(`Failed to verify inventory item (group ${groupNumber}):`, verifyData)
+            throw new Error('Failed to verify inventory item')
+          }
+
+          return { success: true, groupIndex: groupIndex + 1 }
+        } catch (error) {
+          console.error(`Error processing group ${groupIndex + 1}:`, error)
+          // Deactivate inventory item if it was created
+          if (inventoryId) {
+            try {
+              await fetch(`https://tcgid.io/api/v2/inventory/${inventoryId}`, {
+                method: 'DELETE',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                },
+              })
+            } catch (deleteError) {
+              console.error('Error deactivating inventory item:', deleteError)
+            }
+          }
+          return { success: false, groupIndex: groupIndex + 1 }
+        }
+      }
+
+      // Update progress message to show verification
+      setProgressMessage('Verifying inventory creation...')
+
+      // Process all groups in parallel
+      const groupPromises = groups.map((group, index) => processGroup(group, index))
+      const results = await Promise.allSettled(groupPromises)
+
+      // Count successes and failures
+      let successCount = 0
+      const failedGroups = []
+
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled' && result.value.success) {
+          successCount++
+        } else {
+          const groupIndex = result.status === 'fulfilled' 
+            ? result.value.groupIndex 
+            : index + 1
+          failedGroups.push(groupIndex)
+        }
+      })
+
+      // Close progress modal
+      setProgressModalOpen(false)
+
+      // Show results
+      if (successCount > 0) {
+        // Show success message (green toast)
+        showSnackbar(`${successCount} Inventory Item${successCount !== 1 ? 's' : ''} created`, 'success')
+        
+        // If there were failures, show error message after success message
+        if (failedGroups.length > 0) {
+          // Wait for success message to be visible, then show error
+          setTimeout(() => {
+            showSnackbar(
+              `Groups ${failedGroups.join(', ')} failed to upload and were deactivated.`,
+              'error'
+            )
+          }, 3000)
+        }
+        
+        // Redirect to inventory page after showing messages
+        setTimeout(() => {
+          navigate('/inventory')
+        }, failedGroups.length > 0 ? 6000 : 2000)
+      } else {
+        // No successes - show error message
+        if (failedGroups.length > 0) {
+          showSnackbar(
+            `Failed to create inventory items. Groups ${failedGroups.join(', ')} could not be processed.`,
+            'error'
+          )
+        } else {
+          showSnackbar('Failed to create inventory items. Please try again.', 'error')
+        }
+      }
+    } catch (error) {
+      console.error('Error creating inventory:', error)
+      setProgressModalOpen(false)
+      showSnackbar('An error occurred while creating inventory. Please try again.', 'error')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleReset = () => {
@@ -239,9 +703,7 @@ export default function CreateInventory() {
       URL.revokeObjectURL(fileObj.preview)
     })
     setSelectedFiles([])
-    setBatchName('')
     setPhotosPerListing('1')
-    setGroupBy('order_selected')
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -303,9 +765,7 @@ export default function CreateInventory() {
             <Box component="ol" sx={{ mt: 1, mb: 0, pl: 2 }}>
               <li>Select or drag and drop image files from your device</li>
               <li>Reorder images by dragging them to change the order (optional)</li>
-              <li>Enter a unique name for this batch (optional)</li>
               <li>Select how many photos should be grouped per listing</li>
-              <li>Choose how photos should be grouped (by order selected, filename, or creation date)</li>
               <li>Click "Create Inventory" to process your upload</li>
             </Box>
             <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic' }}>
@@ -384,102 +844,115 @@ export default function CreateInventory() {
                   multiple
                   onChange={handleFileInputChange}
                 />
-                <Grid container spacing={2}>
-                  {selectedFiles.map((fileObj, index) => (
-                    <Grid item xs={6} sm={4} md={3} key={fileObj.id}>
-                      <ImageItem
-                        draggable
-                        onDragStart={() => handleDragStart(index)}
-                        onDragOver={(e) => handleDragOverItem(e, index)}
-                        onDragLeave={handleDragLeaveItem}
-                        onDrop={(e) => handleDropItem(e, index)}
-                        onDragEnd={handleDragEnd}
-                        isDragging={draggedIndex === index}
-                        isDragOver={dragOverIndex === index}
-                      >
-                        <Box sx={{ position: 'relative' }}>
-                          <ImagePreview
-                            src={fileObj.preview}
-                            alt={fileObj.file.name}
-                            onError={(e) => {
-                              e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="150" height="150"><rect fill="%23ddd" width="150" height="150"/></svg>'
-                            }}
-                          />
+                <Box
+                  sx={{
+                    maxHeight: { xs: '400px', sm: '500px', md: '600px' },
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
+                    pr: 1,
+                    '&::-webkit-scrollbar': {
+                      width: '8px',
+                    },
+                    '&::-webkit-scrollbar-track': {
+                      backgroundColor: 'rgba(0, 0, 0, 0.05)',
+                      borderRadius: '4px',
+                    },
+                    '&::-webkit-scrollbar-thumb': {
+                      backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                      borderRadius: '4px',
+                      '&:hover': {
+                        backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                      },
+                    },
+                  }}
+                >
+                  <Grid container spacing={2}>
+                    {selectedFiles.map((fileObj, index) => (
+                      <Grid item xs={6} sm={4} md={3} key={fileObj.id}>
+                        <ImageItem
+                          draggable
+                          onDragStart={() => handleDragStart(index)}
+                          onDragOver={(e) => handleDragOverItem(e, index)}
+                          onDragLeave={handleDragLeaveItem}
+                          onDrop={(e) => handleDropItem(e, index)}
+                          onDragEnd={handleDragEnd}
+                          isDragging={draggedIndex === index}
+                          isDragOver={dragOverIndex === index}
+                        >
+                          <Box sx={{ position: 'relative' }}>
+                            <ImagePreview
+                              src={fileObj.preview}
+                              alt={fileObj.file.name}
+                              onError={(e) => {
+                                e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="150" height="150"><rect fill="%23ddd" width="150" height="150"/></svg>'
+                              }}
+                            />
+                            <Box
+                              sx={{
+                                position: 'absolute',
+                                top: 4,
+                                left: 4,
+                                backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                                color: 'white',
+                                borderRadius: '50%',
+                                width: 24,
+                                height: 24,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.75rem',
+                                fontWeight: 'bold',
+                              }}
+                            >
+                              {index + 1}
+                            </Box>
+                            <IconButton
+                              size="small"
+                              sx={{
+                                position: 'absolute',
+                                top: 4,
+                                right: 4,
+                                backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                                color: 'white',
+                                '&:hover': {
+                                  backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                },
+                              }}
+                              onClick={() => handleRemoveFile(fileObj.id)}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                          <Box sx={{ mt: 1 }}>
+                            <Typography variant="caption" noWrap sx={{ display: 'block' }}>
+                              {fileObj.file.name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {formatFileSize(fileObj.file.size)}
+                            </Typography>
+                          </Box>
                           <Box
                             sx={{
-                              position: 'absolute',
-                              top: 4,
-                              left: 4,
-                              backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                              color: 'white',
-                              borderRadius: '50%',
-                              width: 24,
-                              height: 24,
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              fontSize: '0.75rem',
-                              fontWeight: 'bold',
+                              mt: 0.5,
+                              color: 'text.secondary',
                             }}
                           >
-                            {index + 1}
+                            <DragIndicatorIcon fontSize="small" />
+                            <Typography variant="caption" sx={{ ml: 0.5 }}>
+                              Drag to reorder
+                            </Typography>
                           </Box>
-                          <IconButton
-                            size="small"
-                            sx={{
-                              position: 'absolute',
-                              top: 4,
-                              right: 4,
-                              backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                              color: 'white',
-                              '&:hover': {
-                                backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                              },
-                            }}
-                            onClick={() => handleRemoveFile(fileObj.id)}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-                        <Box sx={{ mt: 1 }}>
-                          <Typography variant="caption" noWrap sx={{ display: 'block' }}>
-                            {fileObj.file.name}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {formatFileSize(fileObj.file.size)}
-                          </Typography>
-                        </Box>
-                        <Box
-                          sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            mt: 0.5,
-                            color: 'text.secondary',
-                          }}
-                        >
-                          <DragIndicatorIcon fontSize="small" />
-                          <Typography variant="caption" sx={{ ml: 0.5 }}>
-                            Drag to reorder
-                          </Typography>
-                        </Box>
-                      </ImageItem>
-                    </Grid>
-                  ))}
-                </Grid>
+                        </ImageItem>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
               </Box>
             )}
           </Box>
-
-          {/* Batch Name Field */}
-          <TextField
-            label="Batch Name (Optional)"
-            value={batchName}
-            onChange={(e) => setBatchName(e.target.value)}
-            placeholder="Enter a name for this batch (optional)"
-            fullWidth
-            helperText="Choose a descriptive name to identify this batch later (optional)"
-          />
 
           {/* Photos Per Listing Dropdown */}
           <FormControl fullWidth>
@@ -502,43 +975,8 @@ export default function CreateInventory() {
               <MenuItem value="12">12 photos</MenuItem>
             </Select>
             <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-              Select how many photos should be grouped together for each listing
-            </Typography>
-          </FormControl>
-
-          {/* Group By Radio Selector */}
-          <FormControl component="fieldset">
-            <FormLabel component="legend">Group Photos By</FormLabel>
-            <RadioGroup
-              value={groupBy}
-              onChange={(e) => setGroupBy(e.target.value)}
-              row
-              sx={{ 
-                flexDirection: { xs: 'column', sm: 'row' },
-                gap: { xs: 0, sm: 2 }
-              }}
-            >
-              <FormControlLabel 
-                value="order_selected" 
-                control={<Radio />} 
-                label="Order Selected" 
-              />
-              <FormControlLabel 
-                value="filename" 
-                control={<Radio />} 
-                label="Filename" 
-              />
-              <FormControlLabel 
-                value="creation_date" 
-                control={<Radio />} 
-                label="Creation Date" 
-              />
-            </RadioGroup>
-            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-              Choose how photos should be grouped when creating listings. 
-              Order Selected uses the order you've arranged the images (default). 
-              Filename grouping uses the file names to determine groups, 
-              while creation date grouping uses the file creation timestamps.
+              Select how many photos should be grouped together for each listing. 
+              The total number of photos must be evenly divisible by this number.
             </Typography>
           </FormControl>
 
@@ -565,9 +1003,9 @@ export default function CreateInventory() {
               onClick={handleSubmit}
               fullWidth={{ xs: true, sm: false }}
               sx={{ minWidth: { sm: '150px' } }}
-              disabled={selectedFiles.length === 0}
+              disabled={selectedFiles.length === 0 || isSubmitting}
             >
-              Create Inventory
+              {isSubmitting ? 'Creating...' : 'Create Inventory'}
             </Button>
           </Stack>
         </Stack>
@@ -583,6 +1021,61 @@ export default function CreateInventory() {
           {snackbarMessage}
         </Alert>
       </Snackbar>
+
+      {/* Progress Modal */}
+      <Dialog
+        open={progressModalOpen}
+        aria-labelledby="progress-dialog-title"
+        aria-describedby="progress-dialog-description"
+        disableEscapeKeyDown
+        onClose={(event, reason) => {
+          // Prevent closing during processing
+          if (reason === 'backdropClick' || reason === 'escapeKeyDown') {
+            return
+          }
+        }}
+        PaperProps={{
+          sx: {
+            minWidth: { xs: '280px', sm: '400px' },
+            borderRadius: 2,
+          }
+        }}
+      >
+        <DialogContent>
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              py: 3,
+            }}
+          >
+            <CircularProgress size={48} sx={{ mb: 3 }} />
+            <Typography
+              id="progress-dialog-title"
+              variant="h6"
+              component="div"
+              sx={{
+                textAlign: 'center',
+                mb: 1,
+                fontWeight: 500,
+              }}
+            >
+              {progressMessage}
+            </Typography>
+            {progressMessage.includes('Uploading') && (
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ textAlign: 'center' }}
+              >
+                Please wait while your images are being uploaded...
+              </Typography>
+            )}
+          </Box>
+        </DialogContent>
+      </Dialog>
     </Box>
   )
 }
