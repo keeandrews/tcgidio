@@ -30,8 +30,50 @@ export default function Navigation() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuTimeout, setMenuTimeout] = useState(null)
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
+  const [balance, setBalance] = useState(null)
+  const [balanceLoading, setBalanceLoading] = useState(false)
+  const [balanceError, setBalanceError] = useState(null)
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
+
+  const fetchBalance = async () => {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      setBalance(null)
+      return
+    }
+
+    setBalanceLoading(true)
+    setBalanceError(null)
+
+    try {
+      const response = await fetch('https://tcgid.io/api/transactions/balance', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch balance: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      
+      if (data.success && data.data) {
+        setBalance(data.data.balance)
+      } else {
+        throw new Error('Invalid response format')
+      }
+    } catch (error) {
+      console.error('Error fetching balance:', error)
+      setBalanceError(error.message)
+      setBalance(null)
+    } finally {
+      setBalanceLoading(false)
+    }
+  }
 
   const checkAuthentication = () => {
     const token = localStorage.getItem('token')
@@ -44,12 +86,15 @@ export default function Navigation() {
         if (claims.exp && claims.exp * 1000 > Date.now()) {
           setIsAuthenticated(true)
           setUserClaims(claims)
+          // Fetch balance when authenticated
+          fetchBalance()
         } else {
           // Token expired, clear storage
           localStorage.removeItem('token')
           localStorage.removeItem('userClaims')
           setIsAuthenticated(false)
           setUserClaims(null)
+          setBalance(null)
         }
       } catch (error) {
         console.error('Error parsing user claims:', error)
@@ -57,10 +102,12 @@ export default function Navigation() {
         localStorage.removeItem('userClaims')
         setIsAuthenticated(false)
         setUserClaims(null)
+        setBalance(null)
       }
     } else {
       setIsAuthenticated(false)
       setUserClaims(null)
+      setBalance(null)
     }
   }
 
@@ -98,6 +145,7 @@ export default function Navigation() {
     localStorage.removeItem('userClaims')
     setIsAuthenticated(false)
     setUserClaims(null)
+    setBalance(null)
     setMenuOpen(false)
     setAnchorEl(null)
     // Dispatch event to update Navigation component
@@ -184,11 +232,26 @@ export default function Navigation() {
         ) : (
           <>
             <ListItem>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <AccountCircleIcon color="primary" />
-                <Typography variant="subtitle1">
-                  {userClaims?.first_name || 'User'}
-                </Typography>
+              <Stack direction="column" spacing={0.5}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <AccountCircleIcon color="primary" />
+                  <Typography variant="subtitle1">
+                    {userClaims?.first_name || 'User'}
+                  </Typography>
+                </Stack>
+                {balanceLoading ? (
+                  <Typography variant="body2" color="text.secondary">
+                    Loading balance...
+                  </Typography>
+                ) : balanceError ? (
+                  <Typography variant="body2" color="error">
+                    Error loading balance
+                  </Typography>
+                ) : balance !== null ? (
+                  <Typography variant="body2" color="primary" fontWeight="medium">
+                    Credits: {balance.toLocaleString()}
+                  </Typography>
+                ) : null}
               </Stack>
             </ListItem>
             <Divider />
@@ -308,22 +371,43 @@ export default function Navigation() {
               {isAuthenticated && (
                 <Stack
                   direction="row"
-                  spacing={1}
+                  spacing={2}
                   alignItems="center"
                   sx={{
                     ml: 'auto',
-                    cursor: 'pointer',
-                    '&:hover': {
-                      opacity: 0.8,
-                    },
                   }}
-                  onMouseEnter={handleMenuOpen}
-                  onMouseLeave={handleMenuClose}
                 >
-                  <AccountCircleIcon sx={{ fontSize: 28 }} />
-                  <Typography variant="body1">
-                    {userClaims?.first_name || 'User'}
-                  </Typography>
+                  {balanceLoading ? (
+                    <Typography variant="body2" color="inherit" sx={{ opacity: 0.8 }}>
+                      Loading...
+                    </Typography>
+                  ) : balanceError ? (
+                    <Typography variant="body2" color="inherit" sx={{ opacity: 0.7 }}>
+                      Balance unavailable
+                    </Typography>
+                  ) : balance !== null ? (
+                    <Typography variant="body1" color="inherit" fontWeight="medium">
+                      Credits: {balance.toLocaleString()}
+                    </Typography>
+                  ) : null}
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    alignItems="center"
+                    sx={{
+                      cursor: 'pointer',
+                      '&:hover': {
+                        opacity: 0.8,
+                      },
+                    }}
+                    onMouseEnter={handleMenuOpen}
+                    onMouseLeave={handleMenuClose}
+                  >
+                    <AccountCircleIcon sx={{ fontSize: 28 }} />
+                    <Typography variant="body1">
+                      {userClaims?.first_name || 'User'}
+                    </Typography>
+                  </Stack>
                   <Menu
                     anchorEl={anchorEl}
                     open={menuOpen}
