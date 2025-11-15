@@ -304,18 +304,8 @@ export default function Navigation() {
             </ListItem>
             <Divider />
             <ListItem disablePadding>
-              <ListItemButton component={RouterLink} to="/" onClick={handleDrawerLinkClick}>
-                <ListItemText primary="Home" />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton component={RouterLink} to="/about" onClick={handleDrawerLinkClick}>
-                <ListItemText primary="About" />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton component={RouterLink} to="/integrations" onClick={handleDrawerLinkClick}>
-                <ListItemText primary="Integrations" />
+              <ListItemButton component={RouterLink} to="/account" onClick={handleDrawerLinkClick}>
+                <ListItemText primary="Account" />
               </ListItemButton>
             </ListItem>
             <ListItem disablePadding>
@@ -500,24 +490,10 @@ export default function Navigation() {
                   >
                     <MenuItem
                       component={RouterLink}
-                      to="/"
+                      to="/account"
                       onClick={handleMenuItemClick}
                     >
-                      Home
-                    </MenuItem>
-                    <MenuItem
-                      component={RouterLink}
-                      to="/about"
-                      onClick={handleMenuItemClick}
-                    >
-                      About
-                    </MenuItem>
-                    <MenuItem
-                      component={RouterLink}
-                      to="/integrations"
-                      onClick={handleMenuItemClick}
-                    >
-                      Integrations
+                      Account
                     </MenuItem>
                     <MenuItem
                       component={RouterLink}
