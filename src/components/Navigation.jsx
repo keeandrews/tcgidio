@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppBar from '@mui/material/AppBar'
 import Toolbar from '@mui/material/Toolbar'
@@ -33,6 +33,7 @@ export default function Navigation() {
   const [balance, setBalance] = useState(null)
   const [balanceLoading, setBalanceLoading] = useState(false)
   const [balanceError, setBalanceError] = useState(null)
+  const containerRef = useRef(null)
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
 
@@ -158,24 +159,71 @@ export default function Navigation() {
       clearTimeout(menuTimeout)
       setMenuTimeout(null)
     }
-    setAnchorEl(event.currentTarget)
-    setMenuOpen(true)
+    if (!menuOpen) {
+      setAnchorEl(event.currentTarget)
+      setMenuOpen(true)
+    }
   }
 
   const handleMenuClose = () => {
-    // Add a small delay before closing to allow moving mouse to menu
+    // Add a delay before closing to allow moving mouse to menu
+    if (menuTimeout) {
+      clearTimeout(menuTimeout)
+    }
     const timeout = setTimeout(() => {
       setMenuOpen(false)
       setAnchorEl(null)
-    }, 100)
+    }, 400)
     setMenuTimeout(timeout)
   }
 
   const handleMenuEnter = () => {
+    // Cancel any pending close when mouse enters menu
     if (menuTimeout) {
       clearTimeout(menuTimeout)
       setMenuTimeout(null)
     }
+  }
+
+  const handleMenuLeave = () => {
+    // Close menu when mouse leaves
+    handleMenuClose()
+  }
+
+  const handleContainerEnter = () => {
+    // Cancel any pending close when mouse is anywhere in container
+    if (menuTimeout) {
+      clearTimeout(menuTimeout)
+      setMenuTimeout(null)
+    }
+  }
+
+  const handleContainerLeave = () => {
+    // Start close timer when leaving entire container
+    handleMenuClose()
+  }
+
+  const handleUserMenuEnter = (event) => {
+    // Cancel any pending close
+    if (menuTimeout) {
+      clearTimeout(menuTimeout)
+      setMenuTimeout(null)
+    }
+    // Open menu when hovering over user name/icon
+    if (!menuOpen) {
+      setAnchorEl(event.currentTarget)
+      setMenuOpen(true)
+    }
+  }
+
+  const handleMenuItemClick = () => {
+    // Close menu immediately when menu item is clicked
+    if (menuTimeout) {
+      clearTimeout(menuTimeout)
+      setMenuTimeout(null)
+    }
+    setMenuOpen(false)
+    setAnchorEl(null)
   }
 
   const toggleMobileDrawer = (open) => (event) => {
@@ -369,52 +417,70 @@ export default function Navigation() {
                 </>
               )}
               {isAuthenticated && (
-                <Stack
-                  direction="row"
-                  spacing={2}
-                  alignItems="center"
+                <Box
+                  ref={containerRef}
+                  onMouseEnter={handleContainerEnter}
+                  onMouseLeave={handleContainerLeave}
                   sx={{
                     ml: 'auto',
+                    display: 'flex',
+                    alignItems: 'center',
                   }}
                 >
-                  {balanceLoading ? (
-                    <Typography variant="body2" color="inherit" sx={{ opacity: 0.8 }}>
-                      Loading...
-                    </Typography>
-                  ) : balanceError ? (
-                    <Typography variant="body2" color="inherit" sx={{ opacity: 0.7 }}>
-                      Balance unavailable
-                    </Typography>
-                  ) : balance !== null ? (
-                    <Typography variant="body1" color="inherit" fontWeight="medium">
-                      Credits: {balance.toLocaleString()}
-                    </Typography>
-                  ) : null}
                   <Stack
                     direction="row"
-                    spacing={1}
+                    spacing={2}
                     alignItems="center"
-                    sx={{
-                      cursor: 'pointer',
-                      '&:hover': {
-                        opacity: 0.8,
-                      },
-                    }}
-                    onMouseEnter={handleMenuOpen}
-                    onMouseLeave={handleMenuClose}
                   >
-                    <AccountCircleIcon sx={{ fontSize: 28 }} />
-                    <Typography variant="body1">
-                      {userClaims?.first_name || 'User'}
-                    </Typography>
+                    {balanceLoading ? (
+                      <Typography variant="body2" color="inherit" sx={{ opacity: 0.8 }}>
+                        Loading...
+                      </Typography>
+                    ) : balanceError ? (
+                      <Typography variant="body2" color="inherit" sx={{ opacity: 0.7 }}>
+                        Balance unavailable
+                      </Typography>
+                    ) : balance !== null ? (
+                      <Typography variant="body1" color="inherit" fontWeight="medium">
+                        Credits: {balance.toLocaleString()}
+                      </Typography>
+                    ) : null}
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      alignItems="center"
+                      onMouseEnter={handleUserMenuEnter}
+                      sx={{
+                        cursor: 'pointer',
+                        '&:hover': {
+                          opacity: 0.8,
+                        },
+                      }}
+                    >
+                      <AccountCircleIcon sx={{ fontSize: 28 }} />
+                      <Typography variant="body1">
+                        {userClaims?.first_name || 'User'}
+                      </Typography>
+                    </Stack>
                   </Stack>
                   <Menu
                     anchorEl={anchorEl}
                     open={menuOpen}
-                    onClose={handleMenuClose}
+                    onClose={() => {
+                      if (menuTimeout) {
+                        clearTimeout(menuTimeout)
+                        setMenuTimeout(null)
+                      }
+                      setMenuOpen(false)
+                      setAnchorEl(null)
+                    }}
                     MenuListProps={{
                       onMouseEnter: handleMenuEnter,
-                      onMouseLeave: handleMenuClose,
+                      onMouseLeave: handleMenuLeave,
+                    }}
+                    PaperProps={{
+                      onMouseEnter: handleMenuEnter,
+                      onMouseLeave: handleMenuLeave,
                     }}
                     anchorOrigin={{
                       vertical: 'bottom',
@@ -424,43 +490,50 @@ export default function Navigation() {
                       vertical: 'top',
                       horizontal: 'right',
                     }}
+                    disableAutoFocusItem
                     sx={{
-                      mt: 1,
+                      mt: 0.5,
+                      '& .MuiPaper-root': {
+                        pointerEvents: 'auto',
+                      },
                     }}
                   >
                     <MenuItem
                       component={RouterLink}
                       to="/"
-                      onClick={handleMenuClose}
+                      onClick={handleMenuItemClick}
                     >
                       Home
                     </MenuItem>
                     <MenuItem
                       component={RouterLink}
                       to="/about"
-                      onClick={handleMenuClose}
+                      onClick={handleMenuItemClick}
                     >
                       About
                     </MenuItem>
                     <MenuItem
                       component={RouterLink}
                       to="/integrations"
-                      onClick={handleMenuClose}
+                      onClick={handleMenuItemClick}
                     >
                       Integrations
                     </MenuItem>
                     <MenuItem
                       component={RouterLink}
                       to="/inventory"
-                      onClick={handleMenuClose}
+                      onClick={handleMenuItemClick}
                     >
                       Inventory
                     </MenuItem>
-                    <MenuItem onClick={handleSignOut}>
+                    <MenuItem onClick={() => {
+                      handleMenuItemClick()
+                      handleSignOut()
+                    }}>
                       Sign Out
                     </MenuItem>
                   </Menu>
-                </Stack>
+                </Box>
               )}
             </Stack>
           )}
